@@ -1,0 +1,14 @@
+#ansible_sudo_pass: "Password"
+
+admin_email: "mathieu+fmr@ghack.net"
+
+storage_disk: "/dev/sdb"   # /mnt/localdisk
+storage_mount: "/mnt/localdisk"
+sounds_path: "{{ storage_mount }}/discotheque"
+
+# echo -n "MotDePasse" |md5sum
+airtime_pass_md5: "058907f77901800f0e8fab406d4880fa"
+
+# Driver of the main soundcard
+soundcard_1: "snd-ice1712"   # M2496 [M Audio Audiophile 24/96], device 0: ICE1712
+soundcard_2: "snd-hda-intel" # MID [HDA Intel MID]

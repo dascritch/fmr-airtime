@@ -1,0 +1,8 @@
+# Tous les serveurs de FMR
+[Servers]
+airtime     ansible_ssh_user=fmr
+
+# Les serveurs de diffusion Airtime/Liquidsoap
+[Airtime]
+airtime
+
