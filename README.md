@@ -2,6 +2,8 @@
 
 Paramétrages du service de diffusion continue de [Radio FMR](http://radio-fmr.net/).
 
+[Document de travail temporaire](https://lite5.framapad.org/p/FMR-Airtime-Howto)
+
 ## Ubuntu
 
 L'installation d'Ubuntu Server sur la machine se fait automatiquement.
