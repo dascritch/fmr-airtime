@@ -37,5 +37,5 @@ Il ne reste plus qu'à booter la machine, cliquer `<F10>` pour choisir de démar
 
 Si tout s'est bien passé, la machine s'éteint.
 
-Il ne reste qu'à la rallumer et y installer Airtime avec Ansible : voir [ansible_playbook](../ansible_playbook).
+Il ne reste qu'à retirer la clé, rallumer le serveur et y installer Airtime avec Ansible : voir [ansible_playbook](../ansible_playbook).
 
