@@ -1,0 +1,24 @@
+#!/bin/bash
+
+SRC="{{ nas_mount }}/"  # The trailing "/" is important!
+DST="{{ sounds_path }}"
+
+PID="/var/lock/sync_nas.pid"
+
+# Kill a previously launched instance
+if [ -s "$PID" ]; then
+  kill $(cat "$PID")
+fi
+
+# Keep track of our PID so we can kill it later
+echo $$ > "$PID"
+
+mount "$SRC" 2>/dev/null \
+  && rsync -aq --del --no-perms --exclude=lost+found "$SRC" "$DST"
+
+# Unmount NAS even if rsync failed
+umount "$SRC" 2>/dev/null
+
+# Ended without problem, remove our PID file
+rm "$PID"
+

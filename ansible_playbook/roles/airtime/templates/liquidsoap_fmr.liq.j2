@@ -1,0 +1,77 @@
+# Configuration Liquidsoap permettant de jouer de la musique quand aucune
+# émission n'est programmée.
+
+# Note : ce fichier doit être inclu (%include "/home/fmr/ls_fmr.liq") dans
+# celui d'Airtime (/usr/lib/airtime/pypo/bin/liquidsoap_scripts/ls_script.liq),
+# juste avant les deux lignes commençant par "default = ", qui doivent être
+# commentées.
+
+# Liquidsoap Documentation:
+# - Language: http://savonet.sourceforge.net/doc-svn/language.html
+# - Reference: http://savonet.sourceforge.net/doc-svn/reference.html
+#   - playlist() http://savonet.sourceforge.net/doc-svn/reference.html#playlist
+#   - rotate() http://savonet.sourceforge.net/doc-svn/reference.html#rotate
+#   - fallback() http://savonet.sourceforge.net/doc-svn/reference.html#fallback
+
+############################################################
+# Préparation des fonds musicaux
+############################################################
+
+# Albums
+# - Recharge la playlist toutes les 6h (21600s) pour incorporer les nouveaux sonores
+albums = playlist(mode="random", reload=21600, "{{ sounds_path }}/Albums")
+# - Text-to-speech annoncant le titre qui vient d'être joué
+#albums = say_metadata(pattern="say:$(if $(artist),\"It was $(artist)$(if $(title),\\", $(title)\\").\")", albums)
+
+music = rotate([albums])
+
+# Jingles
+# - Au moins un jingle toutes les 8m (500s)
+#   En prod, on montera à 45m (2700s)
+# - Recharge la playlist toutes les 6h (21600s)
+jingles = playlist(mode="random", reload=21600, "{{ sounds_path }}/Jingles")
+jingles = delay(500.,jingles)
+# - Text-to-speech annoncant l'heure courante
+#jingles = say_metadata(pattern="time:It is now $(time).", jingles)
+
+# Publicités
+# - Au moins une pub toutes les 15m (900s)
+#   Stratégiquement on a plus de mouvements en promos.
+# - Recharge la playlist toutes les 2h (7200s)
+publicites = playlist(mode="random", reload=7200, "{{ sounds_path }}/Publicites")
+publicites = delay(900. ,publicites)
+
+# Top horaire
+# - Recharge la playlist toutes les heures
+tophoraire = playlist(mode='random', reload=3600, "{{ sounds_path }}/Top")
+
+# Sécurité
+# TODO - Sonore diffusé si aucun autre son n'est disponible.
+#security = single("{{ storage_mount }}/securite.ogg")
+security = single("{{ sounds_path }}/Jingles/dusport radio fmr 89,1 mhz.wav")
+
+############################################################
+# Arrangement
+############################################################
+
+# Rotation des sonores
+# - Ratio 3/4 musique 1/8 jingles 1/8 pubs
+rotation = rotate(weights=[1,6,1], [jingles,music,publicites])
+
+# Sécurité : si aucune piste dispo, on se rabat sur une piste de sécurité
+radio = fallback(track_sensitive=false, [rotation,security])
+
+# Multiplie l'amplitude du signal
+radio = amplify(1., override="replay_gain", radio)
+
+# Normalise le signal
+radio = normalize(radio)
+
+# Ajoute le top horaire
+radio_top = add([radio, switch([ ({ 59m and 54s-59s }, delay(5., tophoraire)) ]) ])
+
+############################################################
+
+# Airtime diffuse la playlist "default" quand aucune émission n'est programmée
+default = mksafe(radio_top)
+

@@ -20,6 +20,7 @@
     - wget
     - mudita24
     - convmv
+    - cifs-utils
     #- festival
   tags: packages
 
@@ -68,14 +69,18 @@
   sudo: yes
   file: path="{{ storage_mount }}" state=directory mode=0755
   when: disk_exist.stat.exists
-  tags: filesystem
+  tags:
+    - filesystem
+    - mounts
 
 - name: Mount storage disk
   sudo: yes
   mount: name="{{ storage_mount }}" src=/dev/localdisk-vg/storage fstype=ext4
          state=mounted
   when: disk_exist.stat.exists
-  tags: filesystem
+  tags:
+    - filesystem
+    - mounts
 
 - name: Create Airtime folder
   sudo: yes
@@ -90,6 +95,41 @@
         mode=0775 owner="{{ main_user }}" group="{{ main_user }}"
   when: disk_exist.stat.exists
   tags: filesystem
+
+######################################################################
+# Sound files synchronisation from remote NAS
+######################################################################
+
+- name: Install Samba packages
+  sudo: yes
+  apt: name={{ item }} state=latest
+  with_items:
+    - cifs-utils
+  tags:
+    - packages
+    - mounts
+
+- name: Remote NAS mount point directory creation
+  sudo: yes
+  file: path="{{ nas_mount }}" state=directory mode=0555
+  tags: mounts
+
+- name: Mount remote NAS
+  sudo: yes
+  mount: name="{{ nas_mount }}" src="//{{ nas_hostname }}/{{ nas_share}}" fstype=cifs
+         state=present opts=rw,noauto,user,guest
+  tags: mounts
+
+- name: Deploy synchronisation script
+  template: src=sync_nas.sh.j2 dest="/home/{{ main_user }}/sync_nas.sh" mode=0755
+  tags: nas_sync
+
+- name: Cron schedule synchronisation script
+  cron: name="Synchronisation of remote NAS"
+        user="{{ main_user }}"
+        job="/home/{{ main_user }}/sync_nas.sh"
+        minute=55
+  tags: nas_sync
 
 ######################################################################
 # Airtime
@@ -190,6 +230,36 @@
   command: mv "{{ opus_file.stdout }}" "{{ opus_file.stdout }}_BAK"
   when: opus.stat.exists
   tags: airtime
+
+######################################################################
+# Airtime configuration
+######################################################################
+
+- name: Deploy Liquidsoap script
+  template: src=liquidsoap_fmr.liq.j2 dest="/home/{{ main_user }}/liquidsoap_fmr.liq" mode=0644
+  tags:
+    - airtime
+    - liquidsoap_default
+
+- name: Include our default Liquidsoap playlist script into Airtime
+  sudo: yes
+  lineinfile: dest=/usr/lib/airtime/pypo/bin/liquidsoap_scripts/ls_script.liq
+              insertbefore="^default = amplify.*"
+              line='%include "/home/{{ main_user }}/liquidsoap_fmr.liq"'
+  tags:
+    - airtime
+    - liquidsoap_default
+
+- name: Comment default Liquidsoap playlist into Airtime
+  sudo: yes
+  lineinfile: dest=/usr/lib/airtime/pypo/bin/liquidsoap_scripts/ls_script.liq
+              regexp="{{ item.r }}" line="{{ item.l }}" backrefs=yes
+  with_items:
+    - { r: '^(default = amplify.*)', l: '#\1' }
+    #- { r: '^(default = rewrite_metadata.*)', l: '#\1' }
+  tags:
+    - airtime
+    - liquidsoap_default
 
 ######################################################################
 # Soundcards order

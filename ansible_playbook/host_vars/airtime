@@ -5,6 +5,9 @@ admin_email: "mathieu+fmr@ghack.net"
 storage_disk: "/dev/sdb"   # /mnt/localdisk
 storage_mount: "/mnt/localdisk"
 sounds_path: "{{ storage_mount }}/discotheque"
+nas_mount: "/mnt/nas"
+nas_hostname: "192.168.1.100"
+nas_share: "Telechargements/discotheque"
 
 # echo -n "MotDePasse" |md5sum
 airtime_pass_md5: "058907f77901800f0e8fab406d4880fa"

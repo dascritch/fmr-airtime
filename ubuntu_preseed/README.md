@@ -21,21 +21,23 @@ kernel /install/vmlinuz
 append initrd=/install/initrd.gz file=/cdrom/fmr-airtime-ubuntu.preseed auto=true priority=critical vga=788  quiet --
 ```
 
-**Attention** : il y a une petite subtilité pour la machine installée en 2014, concernant ses disques-durs :
+**Remarque** : S'il y avait une petite subtilité de ce genre concernant les disques-durs :
 
 - `/dev/sda` (IDE, 1 To) : est utilisé pour le stockage des sonores ;
 - `/dev/sdb` (SATA, 500 Go) : est dédié au système.
 
-Il a donc fallu modifier les options du fichier preseed :
+Il faudrait modifier les options du fichier preseed :
 
 - `d-i partman-auto/disk string /dev/sdb` ; et
-- `d-i grub-installer/bootdev  string /dev/sdb /dev/sda`
+- `d-i grub-installer/bootdev  string /dev/sdb`
 
 # Installation automatique
 
-Il ne reste plus qu'à booter la machine, cliquer `<F10>` pour choisir de démarrer sur la clé USB, et l'installation *devrait* se faire automatiquement.
+Il ne reste plus qu'à booter la machine, taper aussitôt `<F10>` pour pouvoir choisir de démarrer sur la clé USB, et l'installation *devrait* se faire complètement automatiquement.
 
-Si tout s'est bien passé, la machine s'éteint.
+Si l'installation s'est bien passée, la machine s'éteint.
 
-Il ne reste qu'à retirer la clé, rallumer le serveur et y installer Airtime avec Ansible : voir [ansible_playbook](../ansible_playbook).
+Il ne reste qu'à retirer la clé USB et rallumer le serveur.
+
+On peut maintenant y installer **Airtime** via Ansible : voir [ansible_playbook](../ansible_playbook).
 

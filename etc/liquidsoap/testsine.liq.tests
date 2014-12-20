@@ -1,8 +1,0 @@
-#!/usr/bin/liquidsoap -v --debug
-
-set("log.file.path","/var/log/liquidsoap/test.log")
-set("log.stdout",true)
-set("log.file",true)
-set("frame.audio.samplerate",44100)
-test = sine(440.0,amplitude=0.05,duration=1.0)
-output.alsa(test)
