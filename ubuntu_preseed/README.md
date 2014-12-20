@@ -2,17 +2,17 @@ Procédure suivie pour installer Ubuntu Server 14.04.1 pour FMR.
 
 # Création de la clé USB
 
-1. Télécharger `ubuntu-14.04.1-server-amd64.iso` ;
+- Télécharger `ubuntu-14.04.1-server-amd64.iso` ;
   - Liens [Bittorrent](http://releases.ubuntu.com/14.04.1/ubuntu-14.04.1-desktop-amd64.iso.torrent) et [direct](http://releases.ubuntu.com/14.04.1/ubuntu-14.04.1-server-amd64.iso)
-2. Créer la clé USB avec `Unetbootin`.
+- Créer la clé USB avec `Unetbootin`.
 
-# Installation automatique
+# Préparation du preseed
 
-1. Déposer le fichier `fmr-airtime-ubuntu.preseed` ci-joint à la racine de la clé USB ;
+- Déposer le fichier `fmr-airtime-ubuntu.preseed` ci-joint à la racine de la clé USB ;
 
 Pour générer le mot de passe chiffré : `openssl passwd -1`
 
-2. Modifier le fichier `syslinux.cfg` pour qu'il contienne une entrée configurée ainsi :
+- Modifier le fichier `syslinux.cfg` pour qu'il contienne une entrée configurée ainsi :
 
 ```
 label fmr
@@ -31,6 +31,11 @@ Il a donc fallu modifier les options du fichier preseed :
 - `d-i partman-auto/disk string /dev/sdb` ; et
 - `d-i grub-installer/bootdev  string /dev/sdb /dev/sda`
 
-Il ne reste plus qu'à booter la machine et l'installation //devrait// se faire automatiquement.
+# Installation automatique
 
-Il ne reste qu'à installer Airtime.
+Il ne reste plus qu'à booter la machine, cliquer `<F10>` pour choisir de démarrer sur la clé USB, et l'installation *devrait* se faire automatiquement.
+
+Si tout s'est bien passé, la machine s'éteint.
+
+Il ne reste qu'à la rallumer et y installer Airtime avec Ansible : voir [ansible_playbook](../ansible_playbook).
+
