@@ -222,7 +222,7 @@
 # Airtime Post-install settings
 #=====================================================================
 
-# OPUS plugin seems to prevent OGG files from being played :-(
+# FIXME OPUS plugin seems to prevent OGG files from being played :-(
 - name: AWFULHACK Retrieve path to OPUS Liquidsoap plugin
   sudo: yes
   shell: dpkg -L liquidsoap-plugin-opus |grep opus.cmxs
@@ -244,6 +244,31 @@
   sudo: yes
   command: mv "{{ opus_file.stdout }}" "{{ opus_file.stdout }}_BAK"
   when: opus.stat.exists
+  tags:
+    - airtime
+    - airtime_postinstall
+
+# FIXME Temporary fix for https://github.com/sourcefabric/Airtime/pull/82
+- name: Verify if airtime-liquidsoap starts too early regarding Apache (S91)
+  sudo: yes
+  stat: path="/etc/rc2.d/S20airtime-liquidsoap" get_md5=no get_checksum=no
+  register: starts_too_early
+  tags:
+    - airtime
+    - airtime_postinstall
+
+- name: Set airtime-liquidsoap to start before Apache
+  sudo: yes
+  command: mv "/etc/rc{{ item.rc }}.d/{{ item.old }}airtime-liquidsoap" "/etc/rc{{ item.rc }}.d/{{ item.new }}airtime-liquidsoap"
+  with_items:
+    - { rc: "0", old: "K20", new: "K08" }
+    - { rc: "1", old: "K20", new: "K08" }
+    - { rc: "2", old: "S20", new: "S92" }
+    - { rc: "3", old: "S20", new: "S92" }
+    - { rc: "4", old: "S20", new: "S92" }
+    - { rc: "5", old: "S20", new: "S92" }
+    - { rc: "6", old: "K20", new: "K08" }
+  when: starts_too_early.stat.exists
   tags:
     - airtime
     - airtime_postinstall
