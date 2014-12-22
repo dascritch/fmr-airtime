@@ -18,14 +18,12 @@ Voir [ansible_playbook](ansible_playbook).
 
 ## Configuration manuelle
 
-Il ne reste normalement plus que ces opérations manuelles à faire pour avoir un système fonctionnel :
+Il ne reste normalement plus rien de critique à configurer à la main.
+
+Éventuellement :
 
 - Configurer la sortie du flux d'Airtime. Dans le menu **System > Stream** :
-  - Cocher **Hardware Audio Output** ;
-  - Pour **Output Type**, sélectionner **ALSA** ;
   - Désactiver le **Stream 1** que l'on n'utilisera pas.
-
-- Régler le volume via `alsamixer` (il s'agit des canaux **DAC** et **DAC 1** qui sont à zéro par défaut) ;
 
 # Problèmes connus
 
