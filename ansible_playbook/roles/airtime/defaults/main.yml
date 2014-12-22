@@ -1,2 +1,11 @@
 ---
 # defaults file for airtime
+
+# Password for Airtime "admin" user
+# echo -n "MyPassword" | md5sum
+airtime_pass_md5: "48503dfd58720bd5ff35c102065a52d7"
+
+# Email (mostly never) used by Apache
+admin_email: "root@localhost"
+
+airtime_path: "/srv/airtime/stor"

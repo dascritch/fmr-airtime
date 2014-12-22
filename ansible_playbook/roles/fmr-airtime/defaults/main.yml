@@ -1,0 +1,24 @@
+---
+# defaults file for fmr-airtime
+
+main_user: "fmr"
+
+# storage_disk will be mounted on storage_mount
+storage_disk: "/dev/sdb"
+storage_mount: "/mnt/localdisk"
+
+airtime_path: "{{ storage_mount }}/airtime"
+sounds_path: "{{ storage_mount }}/discotheque"
+
+nas_mount: "/mnt/nas"
+nas_hostname: "192.168.1.100"
+nas_share: "Telechargements/discotheque"
+
+# Driver of the main soundcard
+soundcard_1: "snd-ice1712"   # M2496 [M Audio Audiophile 24/96], device 0: ICE1712
+soundcard_2: "snd-hda-intel" # MID [HDA Intel MID]
+
+soundcard_volume:
+  - { i: "DAC,0", v: "50%" }
+  - { i: "DAC,1", v: "50%" }
+

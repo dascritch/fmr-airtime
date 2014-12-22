@@ -3,4 +3,11 @@
   roles:
     - common
     - airtime
+    - fmr-airtime
+  post_tasks:
+    # Finally, restart the system (but only if it's the first time, of course!)
+    - name: Restart system on first install
+      sudo: yes
+      command: reboot
+      when: airtime_install|changed
 

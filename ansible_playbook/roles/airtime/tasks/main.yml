@@ -10,126 +10,9 @@
   # Update cache if older than 1 day
   apt: name={{ item }} state=latest update_cache=yes cache_valid_time=86400
   with_items:
-    - openssh-server
-    - vim
     - alsa-utils
-    - ntp
-    - mc
-    - links
-    - tree
-    - wget
-    - mudita24
-    - convmv
-    - cifs-utils
     #- festival
   tags: packages
-
-######################################################################
-# Users
-######################################################################
-
-- name: Make sure main user has correct groups
-  sudo: yes
-  user: name="{{ main_user }}" group="{{ main_user }}"
-        groups=audio,cdrom,video append=yes
-  tags: users
-
-######################################################################
-# Partitions & Filesystems
-######################################################################
-
-- name: Verify the existence of our storage disk
-  sudo: yes
-  stat: path="{{ storage_disk }}" get_md5=no get_checksum=no
-  ignore_errors: yes
-  register: disk_exist
-  tags: filesystem
-
-- name: Create LVM VG on storage disk
-  sudo: yes
-  lvg: vg=localdisk-vg pvs="{{ storage_disk }}"
-  ignore_errors: yes
-  when: disk_exist.stat.exists
-  register: vg_created
-  tags: filesystem
-
-- name: Create LVM LV on storage disk
-  sudo: yes
-  lvol: vg=localdisk-vg lv=storage size=100%FREE
-  when: vg_created|success
-  tags: filesystem
-
-- name: Create ext4 filesystem for storage
-  sudo: yes
-  filesystem: fstype=ext4 dev=/dev/localdisk-vg/storage force=no
-  when: vg_created|success
-  tags: filesystem
-
-- name: Mount point directory creation
-  sudo: yes
-  file: path="{{ storage_mount }}" state=directory mode=0755
-  when: disk_exist.stat.exists
-  tags:
-    - filesystem
-    - mounts
-
-- name: Mount storage disk
-  sudo: yes
-  mount: name="{{ storage_mount }}" src=/dev/localdisk-vg/storage fstype=ext4
-         state=mounted
-  when: disk_exist.stat.exists
-  tags:
-    - filesystem
-    - mounts
-
-- name: Create Airtime folder
-  sudo: yes
-  file: path="{{ storage_mount }}/airtime" state=directory
-        mode=0755 owner=root group=root
-  when: disk_exist.stat.exists
-  tags: filesystem
-
-- name: Create sounds library folder
-  sudo: yes
-  file: path="{{ sounds_path }}" state=directory
-        mode=0775 owner="{{ main_user }}" group="{{ main_user }}"
-  when: disk_exist.stat.exists
-  tags: filesystem
-
-######################################################################
-# Sound files synchronisation from remote NAS
-######################################################################
-
-- name: Install Samba packages
-  sudo: yes
-  apt: name={{ item }} state=latest
-  with_items:
-    - cifs-utils
-  tags:
-    - packages
-    - mounts
-
-- name: Remote NAS mount point directory creation
-  sudo: yes
-  file: path="{{ nas_mount }}" state=directory mode=0555
-  tags: mounts
-
-- name: Mount remote NAS
-  sudo: yes
-  mount: name="{{ nas_mount }}" src="//{{ nas_hostname }}/{{ nas_share}}" fstype=cifs
-         state=present opts=rw,noauto,user,guest
-  tags: mounts
-
-- name: Deploy synchronisation script
-  template: src=sync_nas.sh.j2 dest="/home/{{ main_user }}/sync_nas.sh" mode=0755
-  tags: nas_sync
-
-- name: Cron schedule synchronisation script
-  cron: name="Synchronisation of remote NAS"
-        user="{{ main_user }}"
-        job="/home/{{ main_user }}/sync_nas.sh"
-        minute=55
-  tags: nas_sync
 
 ######################################################################
 # Airtime
@@ -158,7 +41,7 @@
   debconf: name=airtime question="{{ item.q }}" value="{{ item.v }}" vtype="{{ item.t }}"
   with_items:
     - { q: "airtime/admin-password",      t: "string",  v: "{{ airtime_pass_md5 }}" }
-    - { q: "airtime/storage-directory",   t: "string",  v: "{{ storage_mount }}/airtime" }
+    - { q: "airtime/storage-directory",   t: "string",  v: "{{ airtime_path }}" }
     - { q: "airtime/apache-setup",        t: "select",  v: "dedicated v-host" }
     - { q: "airtime/apache-deldefault",   t: "select",  v: "remove default" }
     - { q: "airtime/apache-servername",   t: "string",  v: "{{ ansible_hostname }}" }
@@ -173,6 +56,7 @@
 - name: Install Airtime package
   sudo: yes
   apt: name=airtime
+  # Will be used to know if we should reboot or not
   register: airtime_install
   tags: airtime
 
@@ -183,104 +67,9 @@
   changed_when: false
   tags: airtime
 
-# - debug: var=psql_pass.stdout_lines
-#   tags: airtime
-
 - name: Update Airtime admin password into the database
   sudo: yes
   command: sudo -u postgres psql --quiet --no-align --tuples-only -c "UPDATE cc_subjs SET pass = '{{ airtime_pass_md5 }}' WHERE login = 'admin'" airtime
   when: "'{{ airtime_pass_md5 }}' not in psql_pass.stdout"
   tags: airtime
-
-- name: Remove unused packages
-  sudo: yes
-  apt: name="{{ item }}" state=absent purge=yes
-  with_items:
-    - pulseaudio
-    - icecast2
-  tags: airtime
-
-- name: Add sounds folder to Airtime watched folders
-  sudo: yes
-  command: "airtime-import --watch-add {{ sounds_path }}"
-  register: watch_add
-  changed_when: "'successfully' in watch_add.stdout"
-  failed_when: "'not a directory' in watch_add.stdout"
-  tags: airtime
-
-######################################################################
-# Post-install Airtime settings
-######################################################################
-
-- name: AWFULHACK Retrive path to OPUS Liquidsoap plugin
-  sudo: yes
-  shell: dpkg -L liquidsoap-plugin-opus |grep opus.cmxs
-  register: opus_file
-  changed_when: false
-  tags: airtime
-
-- name: AWFULHACK Verify if OPUS Liquidsoap plugin exists
-  sudo: yes
-  stat: path="{{ opus_file.stdout }}"
-  register: opus
-  tags: airtime
-
-- name: AWFULHACK Remove OPUS Liquidsoap plugin which prevents playing OGG
-  sudo: yes
-  command: mv "{{ opus_file.stdout }}" "{{ opus_file.stdout }}_BAK"
-  when: opus.stat.exists
-  tags: airtime
-
-######################################################################
-# Airtime configuration
-######################################################################
-
-- name: Deploy Liquidsoap script
-  template: src=liquidsoap_fmr.liq.j2 dest="/home/{{ main_user }}/liquidsoap_fmr.liq" mode=0644
-  tags:
-    - airtime
-    - liquidsoap_default
-
-- name: Include our default Liquidsoap playlist script into Airtime
-  sudo: yes
-  lineinfile: dest=/usr/lib/airtime/pypo/bin/liquidsoap_scripts/ls_script.liq
-              insertbefore="^default = amplify.*"
-              line='%include "/home/{{ main_user }}/liquidsoap_fmr.liq"'
-  tags:
-    - airtime
-    - liquidsoap_default
-
-- name: Comment default Liquidsoap playlist into Airtime
-  sudo: yes
-  lineinfile: dest=/usr/lib/airtime/pypo/bin/liquidsoap_scripts/ls_script.liq
-              regexp="{{ item.r }}" line="{{ item.l }}" backrefs=yes
-  with_items:
-    - { r: '^(default = amplify.*)', l: '#\1' }
-    #- { r: '^(default = rewrite_metadata.*)', l: '#\1' }
-  tags:
-    - airtime
-    - liquidsoap_default
-
-######################################################################
-# Soundcards order
-######################################################################
-
-- name: Make sure the M-Audio 24/96 ICE1712 is the first soundcard
-  sudo: yes
-  lineinfile: dest=/etc/modprobe.d/alsa-base.conf
-              line="{{ item }}"
-  with_items:
-    - "# Hardcode the sort order of soundcards:"
-    - "options {{ soundcard_1 }} index=0"
-    - "options {{ soundcard_2 }} index=1"
-  tags: sound
-
-######################################################################
-# Finally, restart the system (but only if it's the first time, of course!)
-######################################################################
-
-- name: Restart system on first install
-  sudo: yes
-  command: reboot
-  when: airtime_install|changed
 

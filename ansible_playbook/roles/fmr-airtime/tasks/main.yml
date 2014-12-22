@@ -1,0 +1,316 @@
+---
+# tasks file for fmr-airtime
+
+######################################################################
+# Packages
+######################################################################
+
+- name: Install packages required for FMR Airtime
+  sudo: yes
+  # Update cache if older than 1 day
+  apt: name={{ item }} state=latest update_cache=yes cache_valid_time=86400
+  with_items:
+    - vim
+    - ntp
+    - mc
+    - links
+    - tree
+    - wget
+    - mudita24
+    - convmv
+    - cifs-utils
+    #- festival
+  tags: packages
+
+######################################################################
+# Users
+######################################################################
+
+- name: Make sure main user has correct groups
+  sudo: yes
+  user: name="{{ main_user }}" group="{{ main_user }}"
+        groups=audio,cdrom,video append=yes
+  tags: users
+
+######################################################################
+# Partitions & Filesystems
+######################################################################
+
+- name: Verify the existence of our storage disk
+  sudo: yes
+  stat: path="{{ storage_disk }}" get_md5=no get_checksum=no
+  ignore_errors: yes
+  register: disk_exist
+  tags:
+    - filesystem
+    - mounts
+
+- name: Create LVM VG on storage disk
+  sudo: yes
+  lvg: vg=localdisk-vg pvs="{{ storage_disk }}"
+  ignore_errors: yes
+  when: disk_exist.stat.exists
+  register: vg_created
+  tags: filesystem
+
+- name: Create LVM LV on storage disk
+  sudo: yes
+  lvol: vg=localdisk-vg lv=storage size=100%FREE
+  when: vg_created|success
+  tags: filesystem
+
+- name: Create ext4 filesystem for storage
+  sudo: yes
+  filesystem: fstype=ext4 dev=/dev/localdisk-vg/storage force=no
+  when: vg_created|success
+  tags: filesystem
+
+- name: Mount point directory creation
+  sudo: yes
+  file: path="{{ storage_mount }}" state=directory mode=0755
+  when: disk_exist.stat.exists
+  tags:
+    - filesystem
+    - mounts
+
+# If Airtime (which has already been installed at this point) has created its
+# folder, we should move it to get it back into our mounted fs.
+- name: Verify if Airtime folder exists
+  sudo: yes
+  stat: path="{{ airtime_path }}" get_md5=no get_checksum=no
+  register: airtime_folder
+  tags: filesystem
+
+- name: Temporary move Airtime folder
+  sudo: yes
+  command: mv "{{ airtime_path }}" "/tmp/airtime_tmp"
+  when: airtime_folder.stat.exists
+  tags: filesystem
+
+- name: Mount storage disk
+  sudo: yes
+  mount: name="{{ storage_mount }}" src=/dev/localdisk-vg/storage fstype=ext4
+         state=mounted
+  when: disk_exist.stat.exists
+  tags:
+    - filesystem
+    - mounts
+
+- name: Create Airtime folder
+  sudo: yes
+  file: path="{{ airtime_path }}" state=directory
+        mode=0755 owner=root group=root
+  when: disk_exist.stat.exists and airtime_folder.stat.exists == false
+  tags: filesystem
+
+- name: Move back already existing Airtime folder
+  sudo: yes
+  command: mv "/tmp/airtime_tmp" "{{ airtime_path }}"
+  when: disk_exist.stat.exists and airtime_folder.stat.exists
+  tags: filesystem
+
+- name: Create sounds library folder
+  sudo: yes
+  file: path="{{ sounds_path }}" state=directory
+        mode=0775 owner="{{ main_user }}" group="{{ main_user }}"
+  when: disk_exist.stat.exists
+  tags: filesystem
+
+######################################################################
+# Sound files synchronisation from remote NAS
+######################################################################
+
+- name: Install Samba packages
+  sudo: yes
+  apt: name={{ item }} state=latest
+  with_items:
+    - cifs-utils
+  tags:
+    - packages
+    - mounts
+
+- name: Remote NAS mount point directory creation
+  sudo: yes
+  file: path="{{ nas_mount }}" state=directory mode=0755
+  tags: mounts
+
+- name: Mount remote NAS
+  sudo: yes
+  mount: name="{{ nas_mount }}" src="//{{ nas_hostname }}/{{ nas_share}}" fstype=cifs
+         state=present opts=rw,noauto,user,guest
+  tags: mounts
+
+- name: Deploy synchronisation script
+  template: src=sync_nas.sh.j2 dest="/home/{{ main_user }}/sync_nas.sh" mode=0755
+  tags: nas_sync
+
+- name: Cron schedule synchronisation script
+  cron: name="Synchronisation of remote NAS"
+        user="{{ main_user }}"
+        job="/home/{{ main_user }}/sync_nas.sh"
+        minute=55
+  tags: nas_sync
+
+- name: Run synchronisation right now, in background
+  shell: /home/{{ main_user }}/sync_nas.sh &
+  tags: nas_sync
+
+######################################################################
+# Soundcards settings
+######################################################################
+
+- name: Make sure the M-Audio 24/96 ICE1712 is the first soundcard
+  sudo: yes
+  lineinfile: dest=/etc/modprobe.d/alsa-base.conf
+              line="{{ item }}"
+  with_items:
+    - "# Hardcode the sort order of soundcards:"
+    - "options {{ soundcard_1 }} index=0"
+    - "options {{ soundcard_2 }} index=1"
+  register: soundcards_order
+  tags: sound
+
+# alsa force-reload seems to always return status code 1 :-(
+- name: Reload ALSA configuration
+  sudo: yes
+  command: alsa force-reload
+  register: alsa_reload
+  failed_when: "alsa_reload.rc != 1"
+  when: soundcards_order|changed
+  tags: sound
+
+# Set sound volume
+- name: Set ALSA volume on our ICE1712 (only on first install)
+  command: amixer -c0 set "{{ item.i }}" "{{ item.v }}" unmute
+  with_items: soundcard_volume
+  when: airtime_install|changed
+  tags: sound
+
+######################################################################
+# Airtime specifics
+######################################################################
+
+- name: Remove unused packages
+  sudo: yes
+  apt: name="{{ item }}" state=absent purge=yes
+  with_items:
+    - pulseaudio
+    - icecast2
+  tags: airtime
+
+- name: Add sounds folder to Airtime watched folders
+  sudo: yes
+  command: "airtime-import --watch-add {{ sounds_path }}"
+  register: watch_add
+  changed_when: "'successfully' in watch_add.stdout"
+  failed_when: "'not a directory' in watch_add.stdout"
+  tags: airtime
+
+######################################################################
+# Airtime configuration
+######################################################################
+
+#=====================================================================
+# Airtime Post-install settings
+#=====================================================================
+
+# OPUS plugin seems to prevent OGG files from being played :-(
+- name: AWFULHACK Retrieve path to OPUS Liquidsoap plugin
+  sudo: yes
+  shell: dpkg -L liquidsoap-plugin-opus |grep opus.cmxs
+  register: opus_file
+  changed_when: false
+  tags:
+    - airtime
+    - airtime_postinstall
+
+- name: AWFULHACK Verify if OPUS Liquidsoap plugin exists
+  sudo: yes
+  stat: path="{{ opus_file.stdout }}" get_md5=no get_checksum=no
+  register: opus
+  tags:
+    - airtime
+    - airtime_postinstall
+
+- name: AWFULHACK Remove OPUS Liquidsoap plugin which prevents playing OGG
+  sudo: yes
+  command: mv "{{ opus_file.stdout }}" "{{ opus_file.stdout }}_BAK"
+  when: opus.stat.exists
+  tags:
+    - airtime
+    - airtime_postinstall
+
+#=====================================================================
+# Set Airtime output to ALSA
+#=====================================================================
+# SQL queries are viewable in the source code of Airtime:
+# https://github.com/sourcefabric/Airtime/blob/master/airtime_mvc/build/sql/defaultdata.sql#L20
+
+- name: Verify Airtime output is set to a device
+  command: sudo -u postgres psql --quiet --no-align --tuples-only -c "SELECT value FROM cc_stream_setting WHERE keyname = 'output_sound_device'" airtime
+  sudo: yes
+  register: psql_output_device
+  changed_when: false
+  failed_when: false
+  tags:
+    - airtime
+    - airtime_postinstall
+
+- name: Set Airtime output to a device
+  sudo: yes
+  #command: sudo -u postgres psql --quiet --no-align --tuples-only -c "UPDATE cc_stream_setting SET output_sound_device = true" airtime
+  command: sudo -u postgres psql --quiet --no-align --tuples-only -c "DELETE FROM cc_stream_setting WHERE keyname = 'output_sound_device' ; INSERT INTO cc_stream_setting ("keyname", "value", "type") VALUES ('output_sound_device', 'true', 'boolean');" airtime
+  when: "'true' not in psql_output_device.stdout"
+  tags:
+    - airtime
+    - airtime_postinstall
+
+- name: Verify Airtime output is set to ALSA
+  command: sudo -u postgres psql --quiet --no-align --tuples-only -c "SELECT value FROM cc_stream_setting WHERE keyname = 'output_sound_device_type'" airtime
+  sudo: yes
+  register: psql_output_type
+  changed_when: false
+  failed_when: false
+  tags:
+    - airtime
+    - airtime_postinstall
+
+- name: Set Airtime output to ALSA
+  sudo: yes
+  #command: sudo -u postgres psql --quiet --no-align --tuples-only -c "UPDATE cc_stream_setting SET output_sound_device_type = 'ALSA'" airtime
+  command: sudo -u postgres psql --quiet --no-align --tuples-only -c "DELETE FROM cc_stream_setting WHERE keyname = 'output_sound_device_type' ; INSERT INTO cc_stream_setting ("keyname", "value", "type") VALUES ('output_sound_device_type', 'ALSA', 'string');" airtime
+  when: "'ALSA' not in psql_output_type.stdout"
+  tags:
+    - airtime
+    - airtime_postinstall
+
+#=====================================================================
+# FMR default playlist
+#=====================================================================
+
+- name: Deploy Liquidsoap script
+  template: src=liquidsoap_fmr.liq.j2 dest="/home/{{ main_user }}/liquidsoap_fmr.liq" mode=0644
+  tags:
+    - airtime
+    - default_playlist
+
+- name: Include our default Liquidsoap playlist script into Airtime
+  sudo: yes
+  lineinfile: dest=/usr/lib/airtime/pypo/bin/liquidsoap_scripts/ls_script.liq
+              insertbefore="^default = amplify.*"
+              line='%include "/home/{{ main_user }}/liquidsoap_fmr.liq"'
+  tags:
+    - airtime
+    - default_playlist
+
+- name: Comment default Liquidsoap playlist into Airtime
+  sudo: yes
+  lineinfile: dest=/usr/lib/airtime/pypo/bin/liquidsoap_scripts/ls_script.liq
+              regexp="{{ item.r }}" line="{{ item.l }}" backrefs=yes
+  with_items:
+    - { r: '^(default = amplify.*)', l: '#\1' }
+    #- { r: '^(default = rewrite_metadata.*)', l: '#\1' }
+  tags:
+    - airtime
+    - default_playlist
+
