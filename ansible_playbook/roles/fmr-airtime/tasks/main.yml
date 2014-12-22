@@ -249,10 +249,15 @@
     - airtime_postinstall
 
 #=====================================================================
-# Set Airtime output to ALSA
+# Set Airtime configuration
 #=====================================================================
 # SQL queries are viewable in the source code of Airtime:
 # https://github.com/sourcefabric/Airtime/blob/master/airtime_mvc/build/sql/defaultdata.sql#L20
+#=====================================================================
+
+#---------------------------------------------------------------------
+# Set output to Hardware device
+#---------------------------------------------------------------------
 
 - name: Verify Airtime output is set to a device
   command: sudo -u postgres psql --quiet --no-align --tuples-only -c "SELECT value FROM cc_stream_setting WHERE keyname = 'output_sound_device'" airtime
@@ -262,16 +267,19 @@
   failed_when: false
   tags:
     - airtime
-    - airtime_postinstall
+    - airtime_fmr
 
 - name: Set Airtime output to a device
   sudo: yes
-  #command: sudo -u postgres psql --quiet --no-align --tuples-only -c "UPDATE cc_stream_setting SET output_sound_device = true" airtime
   command: sudo -u postgres psql --quiet --no-align --tuples-only -c "DELETE FROM cc_stream_setting WHERE keyname = 'output_sound_device' ; INSERT INTO cc_stream_setting ("keyname", "value", "type") VALUES ('output_sound_device', 'true', 'boolean');" airtime
   when: "'true' not in psql_output_device.stdout"
   tags:
     - airtime
-    - airtime_postinstall
+    - airtime_fmr
+
+#---------------------------------------------------------------------
+# Set output to ALSA device
+#---------------------------------------------------------------------
 
 - name: Verify Airtime output is set to ALSA
   command: sudo -u postgres psql --quiet --no-align --tuples-only -c "SELECT value FROM cc_stream_setting WHERE keyname = 'output_sound_device_type'" airtime
@@ -281,16 +289,38 @@
   failed_when: false
   tags:
     - airtime
-    - airtime_postinstall
+    - airtime_fmr
 
 - name: Set Airtime output to ALSA
   sudo: yes
-  #command: sudo -u postgres psql --quiet --no-align --tuples-only -c "UPDATE cc_stream_setting SET output_sound_device_type = 'ALSA'" airtime
   command: sudo -u postgres psql --quiet --no-align --tuples-only -c "DELETE FROM cc_stream_setting WHERE keyname = 'output_sound_device_type' ; INSERT INTO cc_stream_setting ("keyname", "value", "type") VALUES ('output_sound_device_type', 'ALSA', 'string');" airtime
   when: "'ALSA' not in psql_output_type.stdout"
   tags:
     - airtime
-    - airtime_postinstall
+    - airtime_fmr
+
+#---------------------------------------------------------------------
+# Disable Stream 1
+#---------------------------------------------------------------------
+
+- name: Verify that Airtime stream 1 is disabled
+  command: sudo -u postgres psql --quiet --no-align --tuples-only -c "SELECT value FROM cc_stream_setting WHERE keyname = 's1_enable'" airtime
+  sudo: yes
+  register: psql_stream_1
+  changed_when: false
+  failed_when: false
+  tags:
+    - airtime
+    - airtime_fmr
+
+- name: Disable Airtime stream 1
+  sudo: yes
+  command: sudo -u postgres psql --quiet --no-align --tuples-only -c "DELETE FROM cc_stream_setting WHERE keyname = 's1_enable' ; INSERT INTO cc_stream_setting ("keyname", "value", "type") VALUES ('s1_enable', 'false', 'boolean');" airtime
+  when: "'false' not in psql_stream_1.stdout"
+  tags:
+    - airtime
+    - airtime_fmr
+
 
 #=====================================================================
 # FMR default playlist

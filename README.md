@@ -18,12 +18,7 @@ Voir [ansible_playbook](ansible_playbook).
 
 ## Configuration manuelle
 
-Il ne reste normalement plus rien de critique à configurer à la main.
-
-Éventuellement :
-
-- Configurer la sortie du flux d'Airtime. Dans le menu **System > Stream** :
-  - Désactiver le **Stream 1** que l'on n'utilisera pas.
+Il ne reste normalement plus rien de fondamental à configurer à la main, le système est fonctionnel.
 
 # Problèmes connus
 
