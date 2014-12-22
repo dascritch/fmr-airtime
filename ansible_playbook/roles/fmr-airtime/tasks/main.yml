@@ -36,6 +36,14 @@
 # Partitions & Filesystems
 ######################################################################
 
+# /tmp should be in RAM (tmpfs)
+- name: Mount /tmp in RAM
+  sudo: yes
+  mount: name=/tmp src=tmpfs fstype=tmpfs state=mounted
+  tags:
+    - filesystem
+    - mounts
+
 - name: Verify the existence of our storage disk
   sudo: yes
   stat: path="{{ storage_disk }}" get_md5=no get_checksum=no
