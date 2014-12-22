@@ -7,7 +7,7 @@ d-i pkgsel/install-language-support boolean false
 d-i debian-installer/quiet  boolean false
 d-i debian-installer/splash boolean false
 # Wait for few seconds in grub
-d-i grub-installer/timeout  string 2
+d-i grub-installer/timeout  string 0
 
 
 #### Contents of the preconfiguration file (for squeeze)
