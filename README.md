@@ -61,3 +61,13 @@ find /mnt/localdisk/discotheque -name "*.mp3" -print0 | xargs -0 mid3iconv -e CP
 find /mnt/localdisk/discotheque -name "*.mp3" -print0 | xargs -0 mid3iconv -e CP1251 --remove-v1
 ```
 
+## Développement
+
+Pour toucher à python, vous devrez [lancer un environnement virtuel](https://github.com/kennethreitz/python-guide/blob/master/docs/dev/virtualenvs.rst)
+
+Oui, pour l'instant, c'est un peu le bazar, [on est en train d'arranger ça](http://iamzed.com/2009/05/07/a-primer-on-virtualenv/)
+
+```
+source adhoc/bin/activate
+```
+

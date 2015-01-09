@@ -1,1 +1,8 @@
 .*.sw?
+.Python
+adhoc/[Bb]in
+adhoc/[Ii]nclude
+adhoc/[Ll]ib
+adhoc/[Ss]cripts
+adhoc/[Ll]ocal
+pyvenv.cfg
