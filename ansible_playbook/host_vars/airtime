@@ -1,8 +1,0 @@
-# Note: most variables are actually set in roles/*/default/main.yml
-# but they can be overrided here.
-
-admin_email: "mathieu+fmr@ghack.net"
-
-# echo -n "MotDePasse" |md5sum
-airtime_pass_md5: "058907f77901800f0e8fab406d4880fa"
-

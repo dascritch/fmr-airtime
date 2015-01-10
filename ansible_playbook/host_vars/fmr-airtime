@@ -1,0 +1,6 @@
+storage_disk: "/dev/sdb"
+
+program_name: "FMR"
+program_code: fmr
+main_user: "{{ program_code }}"
+# NOTE: Don't forget to create the file template/liquidsoap_{{ program_code }}.ls.j2

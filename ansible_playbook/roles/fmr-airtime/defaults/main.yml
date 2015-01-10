@@ -1,13 +1,18 @@
 ---
 # defaults file for fmr-airtime
 
-main_user: "fmr"
+program_name: "FMR"
+program_code: fmr
+main_user: "{{ program_code }}"
+# NOTE: Don't forget to create the file template/liquidsoap_{{ program_code }}.ls.j2
 
 # storage_disk will be mounted on storage_mount
 storage_disk: "/dev/sdb"
 storage_mount: "/mnt/localdisk"
 
-airtime_path: "{{ storage_mount }}/airtime"
+# airtime_path MUST be overrided into a {group,host}_vars file, because it's
+# already been set by roles/airtime/defaults.
+#airtime_path: ""
 sounds_path: "{{ storage_mount }}/discotheque"
 
 nas_mount: "/mnt/nas"

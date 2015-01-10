@@ -1,8 +1,12 @@
 # Tous les serveurs de FMR
 [Servers]
-airtime     ansible_ssh_user=fmr
+fmr-airtime         ansible_ssh_user=deploy
+booster-airtime     ansible_ssh_user=deploy
+londemiroir-airtime ansible_ssh_user=deploy
 
 # Les serveurs de diffusion Airtime/Liquidsoap
 [Airtime]
-airtime
+fmr-airtime
+booster-airtime
+londemiroir-airtime
 

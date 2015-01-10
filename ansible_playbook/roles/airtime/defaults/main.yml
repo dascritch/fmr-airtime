@@ -8,4 +8,7 @@ airtime_pass_md5: "48503dfd58720bd5ff35c102065a52d7"
 # Email (mostly never) used by Apache
 admin_email: "root@localhost"
 
+# Path where Airtime will store files uploaded through the WebUI
+# NOTE: If overrided, it should be done into a {group,host}_vars file.
 airtime_path: "/srv/airtime/stor"
+

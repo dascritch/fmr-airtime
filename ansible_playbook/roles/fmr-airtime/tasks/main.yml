@@ -5,7 +5,7 @@
 # Packages
 ######################################################################
 
-- name: Install packages required for FMR Airtime
+- name: Install packages required for our Airtime
   sudo: yes
   # Update cache if older than 1 day
   apt: name={{ item }} state=latest update_cache=yes cache_valid_time=86400
@@ -29,6 +29,7 @@
 - name: Make sure main user has correct groups
   sudo: yes
   user: name="{{ main_user }}" group="{{ main_user }}"
+        comment="User {{ program_name }},,,"
         groups=audio,cdrom,video append=yes
   tags: users
 
@@ -346,13 +347,14 @@
     - airtime
     - airtime_fmr
 
-
 #=====================================================================
 # FMR default playlist
 #=====================================================================
 
 - name: Deploy Liquidsoap script
-  template: src=liquidsoap_fmr.liq.j2 dest="/home/{{ main_user }}/liquidsoap_fmr.liq" mode=0644
+  template: src="liquidsoap_{{ program_code }}.liq.j2"
+            dest="/home/{{ main_user }}/liquidsoap_{{ program_code }}.liq"
+            mode=0644
   tags:
     - airtime
     - default_playlist
@@ -361,7 +363,7 @@
   sudo: yes
   lineinfile: dest=/usr/lib/airtime/pypo/bin/liquidsoap_scripts/ls_script.liq
               insertbefore="^default = amplify.*"
-              line='%include "/home/{{ main_user }}/liquidsoap_fmr.liq"'
+              line='%include "/home/{{ main_user }}/liquidsoap_{{ program_code }}.liq"'
   tags:
     - airtime
     - default_playlist
