@@ -1,3 +1,6 @@
 [submodule "ansible_playbook/roles/common"]
 	path = ansible_playbook/roles/common
 	url = git@github.com:mathieumd/ansible-role-common.git
+[submodule "ansible_playbook/roles/airtime"]
+	path = ansible_playbook/roles/airtime
+	url = git@github.com:mathieumd/ansible-role-airtime.git
