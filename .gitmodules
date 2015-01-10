@@ -1,0 +1,3 @@
+[submodule "ansible_playbook/roles/common"]
+	path = ansible_playbook/roles/common
+	url = git@github.com:mathieumd/ansible-role-common.git
