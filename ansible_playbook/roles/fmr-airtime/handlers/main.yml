@@ -1,2 +1,11 @@
 ---
 # handlers file for fmr-airtime
+# vim: ft=ansible
+
+- name: Restart airtime-liquidsoap
+  service: name=airtime-liquidsoap state=restarted
+  when: interrupt_stream_ok == true
+
+- name: Restart airtime-media-monitor
+  service: name=airtime-media-monitor state=restarted
+

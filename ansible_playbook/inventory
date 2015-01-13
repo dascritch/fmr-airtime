@@ -1,11 +1,19 @@
 # Tous les serveurs de FMR
 [Servers]
-fmr-airtime         ansible_ssh_user=deploy
-booster-airtime     ansible_ssh_user=deploy
-londemiroir-airtime ansible_ssh_user=deploy
+airtime
+fmr-airtime
+booster-airtime
+londemiroir-airtime
+
+[Servers:vars]
+ansible_ssh_user=deploy
+# FIXME: Temporary fix for https://github.com/ansible/ansible/issues/9986
+# requires to add "sudo: yes" into playbooks as well.
+ansible_sudo=yes
 
 # Les serveurs de diffusion Airtime/Liquidsoap
 [Airtime]
+airtime
 fmr-airtime
 booster-airtime
 londemiroir-airtime

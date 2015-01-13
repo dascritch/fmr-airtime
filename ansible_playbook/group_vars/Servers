@@ -1,4 +1,16 @@
 admin_email: "mathieu+fmr@ghack.net"
 
-locale: "en_US.UTF-8"
+users_list:
+  - "{{ main_user }}"
+  - "{{ ansible_env['SUDO_USER'] }}"
+  - "root"
+users_homes:
+  - "/home/{{ main_user }}"
+  - "{{ ansible_env['PWD'] }}"
+  - "/root"
+
+locale:
+  - en_US.UTF-8
+  - fr_FR.UTF-8
+
 timezone: "Europe/Paris"

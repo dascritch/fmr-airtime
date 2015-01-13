@@ -1,7 +1,8 @@
 #!/bin/bash
+# ATTENTION : fichier géré par Ansible ! Les modifications seront perdues.
 
 SRC="{{ nas_mount }}/"  # The trailing "/" is important!
-DST="{{ sounds_path }}"
+DST="{{ library_path }}"
 
 PID="/var/lock/sync_nas.pid"
 
@@ -14,11 +15,14 @@ fi
 echo $$ > "$PID"
 
 mount "$SRC" 2>/dev/null \
-  && rsync -aq --del --no-perms --exclude=lost+found "$SRC" "$DST"
+  && rsync -aq --del \
+    --no-perms --chmod="ug=rwX,o=rX" \
+    --exclude=lost+found \
+    "$SRC" "$DST"
 
 # Unmount NAS even if rsync failed
 umount "$SRC" 2>/dev/null
 
-# Ended without problem, remove our PID file
+# Ended normally, remove our PID file
 rm "$PID"
 

@@ -1,0 +1,44 @@
+#!/bin/bash
+# ATTENTION : fichier géré par Ansible ! Les modifications seront perdues.
+
+FOND_ROTA="{{ rotation_path }}"
+PLAYLISTS="{{ playlists_path }}"
+
+# List of genres and their IDs available here:
+# http://id3.org/id3v2.3.0#Appendix_A_-_Genre_List_from_ID3v1
+# http://axon.cs.byu.edu/~adam/gatheredinfo/organizedtables/musicgenrelist.php
+
+# The format of the GENRE variable is:
+# Our Genre Name=ID3 Genre IDs (separated by ":")
+GENRES="
+Jazz=8
+Rock=17:40:47:56:78:79:81:91:92:93:94:95:121
+Metal=9:22
+Classical=32:106:105
+Chanson=102
+Soundtrack=24
+Hip-Hop=7:15:61
+"
+
+PID="/var/lock/playlists_creation.pid"
+
+# Kill a previously launched instance
+if [ -s "$PID" ]; then
+  kill $(cat "$PID")
+fi
+
+# Keep track of our PID so we can kill it later
+echo $$ > "$PID"
+
+for dir in $(ls -d "$FOND_ROTA"); do
+    for g in GENRES; do
+        NAME=$(echo $g | cut -s'=' -f1)
+        IDS=$(echo $g | cut -s'=' -f2-)
+        fapg -r $FOND_ROTA      -g$IDS -o $PLAYLISTS/$NAME.m3u
+        fapg -r $FOND_ROTA/$dir -g$IDS -o $PLAYLISTS/${NAME}-Rotation_${dir}.m3u
+    done
+done
+
+# Ended normally, remove our PID file
+rm "$PID"
+

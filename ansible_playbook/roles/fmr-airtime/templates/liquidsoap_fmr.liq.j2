@@ -1,10 +1,7 @@
+# ATTENTION : fichier géré par Ansible ! Les modifications seront perdues.
+
 # Configuration Liquidsoap permettant de jouer de la musique quand aucune
 # émission n'est programmée.
-
-# Note : ce fichier doit être inclu (%include "/home/fmr/ls_fmr.liq") dans
-# celui d'Airtime (/usr/lib/airtime/pypo/bin/liquidsoap_scripts/ls_script.liq),
-# juste avant les deux lignes commençant par "default = ", qui doivent être
-# commentées.
 
 # Liquidsoap Documentation:
 # - Language: http://savonet.sourceforge.net/doc-svn/language.html
@@ -14,53 +11,84 @@
 #   - fallback() http://savonet.sourceforge.net/doc-svn/reference.html#fallback
 
 ############################################################
-# Préparation des fonds musicaux
+# Préparation des sonores
 ############################################################
 
-# Albums
-# - Recharge la playlist toutes les 6h (21600s) pour incorporer les nouveaux sonores
-albums = playlist(mode="random", reload=21600, "{{ sounds_path }}/Albums")
-# - Text-to-speech annoncant le titre qui vient d'être joué
-#albums = say_metadata(pattern="say:$(if $(artist),\"It was $(artist)$(if $(title),\\", $(title)\\").\")", albums)
+# Fond musical - Joué uniquement si rien d'autre n'est disponible
+# - Recharge la liste toutes les 6h (21600s) pour incorporer les nouveaux sonores
+tout = playlist(reload=21600, "{{ music_path }}")
 
-music = rotate([albums])
+# Fond de rotation - Fond normalement diffusé
+rota_forte =    playlist(reload=21600, "{{ rotation_path }}/Forte")
+rota_moyenne =  playlist(reload=21600, "{{ rotation_path }}/Moyenne")
+rota_lente =    playlist(reload=21600, "{{ rotation_path }}/Lente")
+
+# FIXME: Est-ce nécessaire ?
+# Programmation par genres - Style musical en fonction de l'heure
+# Fichiers M3U générés automatiquement par le script playlists_creation.sh
+# jazz = playlist(reload=21600, "{{ playlists_path }}/Jazz.m3u")
+# rock = playlist(reload=21600, "{{ playlists_path }}/Rock.m3u")
+# metal = playlist(reload=21600, "{{ playlists_path }}/Metal.m3u")
+# classical = playlist(reload=21600, "{{ playlists_path }}/Classical.m3u")
+# chanson = playlist(reload=21600, "{{ playlists_path }}/Chanson.m3u")
+# hiphop = playlist(reload=21600, "{{ playlists_path }}/Hip-Hop.m3u")
 
 # Jingles
-# - Au moins un jingle toutes les 8m (500s)
-#   En prod, on montera à 45m (2700s)
+# - Au moins un jingle toutes les 45m (2700s)
 # - Recharge la playlist toutes les 6h (21600s)
-jingles = playlist(mode="random", reload=21600, "{{ sounds_path }}/Jingles")
-jingles = delay(500.,jingles)
-# - Text-to-speech annoncant l'heure courante
-#jingles = say_metadata(pattern="time:It is now $(time).", jingles)
+jingles = playlist(reload=21600, "{{ jingles_path }}")
+# Note: "delay" est contradictoire avec le "weights" de rotate().
+jingles = delay(2700., jingles)
 
 # Publicités
 # - Au moins une pub toutes les 15m (900s)
-#   Stratégiquement on a plus de mouvements en promos.
 # - Recharge la playlist toutes les 2h (7200s)
-publicites = playlist(mode="random", reload=7200, "{{ sounds_path }}/Publicites")
-publicites = delay(900. ,publicites)
+publicites = playlist(reload=7200, "{{ publicites_path }}")
+publicites = delay(900., publicites)
 
 # Top horaire
-# - Recharge la playlist toutes les heures
-tophoraire = playlist(mode='random', reload=3600, "{{ sounds_path }}/Top")
+# - Recharge la playlist toutes les 6h (21600s)
+tophoraire = playlist(reload=21600, "{{ tophoraires_path }}")
 
+{% if security_file %}
 # Sécurité
-# TODO - Sonore diffusé si aucun autre son n'est disponible.
-#security = single("{{ storage_mount }}/securite.ogg")
-security = single("{{ sounds_path }}/Jingles/dusport radio fmr 89,1 mhz.wav")
+# Sonore diffusé si aucun autre son n'est disponible.
+security = single("/home/{{ main_user }}/{{ security_file }}")
 
+{% endif %}
 ############################################################
 # Arrangement
 ############################################################
 
-# Rotation des sonores
-# - Ratio 3/4 musique 1/8 jingles 1/8 pubs
-rotation = rotate(weights=[1,6,1], [jingles,music,publicites])
+# Fréquences de rotation
+rotations = rotate(weights=[6, 3, 1], [rota_forte, rota_moyenne, rota_lente])
 
-# Sécurité : si aucune piste dispo, on se rabat sur une piste de sécurité
-radio = fallback(track_sensitive=false, [rotation,security])
+# FIXME: Est-ce nécessaire ?
+# Programmations horaires
+# genres = switch([
+#                 ({ 6h-12h },  random([classical, chanson]) ),
+#                 ({ 12h-18h }, random([rock, jazz]) ),
+#                 ({ 18h-24h }, random([metal]) ),
+#                 ({ 0h-6h },   random([hiphop]) ),
+#             ])
 
+# Ajoute les programmations si dispo, sinon se rabat sur le fond musical
+music = fallback([
+            # genres,
+            rotations,
+            tout,
+        ])
+
+# Inclusion des jingles et pubs
+radio = rotate([jingles, music, publicites])
+# Note: "weights" est contradictoire avec le "delay()" des playlists.
+#radio = rotate(weights=[1, 6, 1], [jingles, music, publicites])
+
+{% if security_file %}
+# Sécurité : si aucune piste dispo, on se rabat aussitôt sur la piste sécurité
+radio = fallback(track_sensitive=false, [radio, security])
+
+{% endif %}
 # Multiplie l'amplitude du signal
 radio = amplify(1., override="replay_gain", radio)
 
@@ -68,10 +96,16 @@ radio = amplify(1., override="replay_gain", radio)
 radio = normalize(radio)
 
 # Ajoute le top horaire
-radio_top = add([radio, switch([ ({ 59m and 54s-59s }, delay(5., tophoraire)) ]) ])
+radio = smooth_add(
+            delay=0.5,
+            p=0.5,
+            normal=radio,
+            special=switch([
+                ({ 59m and 55s-59s }, delay(5., tophoraire))
+            ]),
+        )
 
 ############################################################
-
 # Airtime diffuse la playlist "default" quand aucune émission n'est programmée
-default = mksafe(radio_top)
+default = mksafe(radio)
 

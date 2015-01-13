@@ -1,13 +1,26 @@
 ---
 - hosts: Airtime
+  # FIXME: Temporary fix for https://github.com/ansible/ansible/issues/9986
+  sudo: yes
+
+  pre_tasks:
+    # Create Main User
+    - name: Create main user
+      user: name="{{ main_user }}" shell=/bin/bash
+            password="{{ main_user_pass_sha512 }}"
+            comment="User {{ program_name }},,,"
+            groups=sudo,audio,cdrom,video
+            append=yes
+      tags: users
+
   roles:
     - common
     - airtime
     - fmr-airtime
+
   post_tasks:
-    # Finally, restart the system (but only if it's the first time, of course!)
+    # Finally, restart the system ONLY if we just installed Airtime!
     - name: Restart system on first install
-      sudo: yes
       command: reboot
       when: airtime_install|changed
 

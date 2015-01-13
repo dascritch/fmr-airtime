@@ -6,7 +6,6 @@
 ######################################################################
 
 - name: Install packages required for our Airtime
-  sudo: yes
   # Update cache if older than 1 day
   apt: name={{ item }} state=latest update_cache=yes cache_valid_time=86400
   with_items:
@@ -19,19 +18,9 @@
     - mudita24
     - convmv
     - cifs-utils
+    - fapg
     #- festival
   tags: packages
-
-######################################################################
-# Users
-######################################################################
-
-- name: Make sure main user has correct groups
-  sudo: yes
-  user: name="{{ main_user }}" group="{{ main_user }}"
-        comment="User {{ program_name }},,,"
-        groups=audio,cdrom,video append=yes
-  tags: users
 
 ######################################################################
 # Partitions & Filesystems
@@ -39,14 +28,12 @@
 
 # /tmp should be in RAM (tmpfs)
 - name: Mount /tmp in RAM
-  sudo: yes
   mount: name=/tmp src=tmpfs fstype=tmpfs state=mounted
   tags:
     - filesystem
     - mounts
 
 - name: Verify the existence of our storage disk
-  sudo: yes
   stat: path="{{ storage_disk }}" get_md5=no get_checksum=no
   ignore_errors: yes
   register: disk_exist
@@ -55,7 +42,6 @@
     - mounts
 
 - name: Create LVM VG on storage disk
-  sudo: yes
   lvg: vg=localdisk-vg pvs="{{ storage_disk }}"
   ignore_errors: yes
   when: disk_exist.stat.exists
@@ -63,74 +49,52 @@
   tags: filesystem
 
 - name: Create LVM LV on storage disk
-  sudo: yes
   lvol: vg=localdisk-vg lv=storage size=100%FREE
-  when: vg_created|success
+  when: disk_exist.stat.exists and vg_created|success
   tags: filesystem
 
 - name: Create ext4 filesystem for storage
-  sudo: yes
   filesystem: fstype=ext4 dev=/dev/localdisk-vg/storage force=no
-  when: vg_created|success
+  when: disk_exist.stat.exists and vg_created|success
   tags: filesystem
-
-- name: Mount point directory creation
-  sudo: yes
-  file: path="{{ storage_mount }}" state=directory mode=0755
-  when: disk_exist.stat.exists
-  tags:
-    - filesystem
-    - mounts
 
 # If Airtime (which has already been installed at this point) has created its
-# folder, we should move it to get it back into our mounted fs.
-- name: Verify if Airtime folder exists
-  sudo: yes
-  stat: path="{{ airtime_path }}" get_md5=no get_checksum=no
-  register: airtime_folder
+# folder, we should remove it before mounting storage disk.
+- name: Remove Airtime folder before mouting storage disk (if Airtime just installed)
+  command: rm -rf "{{ airtime_path }}"
+  when: airtime_install|changed and disk_exist.stat.exists
+  failed_when: false
+  changed_when: false
   tags: filesystem
 
-- name: Temporary move Airtime folder
-  sudo: yes
-  command: mv "{{ airtime_path }}" "/tmp/airtime_tmp"
-  when: airtime_folder.stat.exists
-  tags: filesystem
-
+# Airtime will create its folders by itself when restarted.
 - name: Mount storage disk
-  sudo: yes
   mount: name="{{ storage_mount }}" src=/dev/localdisk-vg/storage fstype=ext4
          state=mounted
   when: disk_exist.stat.exists
+  notify: Restart airtime-media-monitor
   tags:
     - filesystem
     - mounts
 
-- name: Create Airtime folder
-  sudo: yes
-  file: path="{{ airtime_path }}" state=directory
-        mode=0755 owner=root group=root
-  when: disk_exist.stat.exists and airtime_folder.stat.exists == false
-  tags: filesystem
-
-- name: Move back already existing Airtime folder
-  sudo: yes
-  command: mv "/tmp/airtime_tmp" "{{ airtime_path }}"
-  when: disk_exist.stat.exists and airtime_folder.stat.exists
-  tags: filesystem
-
 - name: Create sounds library folder
-  sudo: yes
-  file: path="{{ sounds_path }}" state=directory
+  file: path="{{ library_path }}" state=directory
         mode=0775 owner="{{ main_user }}" group="{{ main_user }}"
   when: disk_exist.stat.exists
   tags: filesystem
+
+# Copy the security sound file on the local FS
+- name: Upload security sound file
+  copy: src="{{ security_file }}"
+        dest="/home/{{ main_user }}/{{ security_file }}"
+        mode=0664 owner="{{ main_user }}" group="{{ main_user }}"
+  when: security_file is defined and security_file != ""
 
 ######################################################################
 # Sound files synchronisation from remote NAS
 ######################################################################
 
 - name: Install Samba packages
-  sudo: yes
   apt: name={{ item }} state=latest
   with_items:
     - cifs-utils
@@ -138,38 +102,70 @@
     - packages
     - mounts
 
-- name: Remote NAS mount point directory creation
-  sudo: yes
-  file: path="{{ nas_mount }}" state=directory mode=0755
-  tags: mounts
+# - name: Remote NAS mount point directory creation
+#   file: path="{{ nas_mount }}" state=directory
+#         mode=0775 owner="{{ main_user }}" group="{{ main_user }}"
+#   tags: mounts
 
-- name: Mount remote NAS
-  sudo: yes
+- name: Setup the mount point of remote NAS
   mount: name="{{ nas_mount }}" src="//{{ nas_hostname }}/{{ nas_share}}" fstype=cifs
-         state=present opts=rw,noauto,user,guest
+         state=mounted opts=ro,noauto,user,guest
+  register: nas_mounted
+  changed_when: false
   tags: mounts
 
-- name: Deploy synchronisation script
-  template: src=sync_nas.sh.j2 dest="/home/{{ main_user }}/sync_nas.sh" mode=0755
-  tags: nas_sync
+- name: Unmount remote NAS now that it has been configured
+  mount: name="{{ nas_mount }}" src="//{{ nas_hostname }}/{{ nas_share}}" fstype=cifs
+         state=unmounted
+  when: nas_mounted|changed
+  changed_when: false
+  tags: mounts
 
-- name: Cron schedule synchronisation script
+# Scripts deployment
+- name: Scripts directory creation
+  file: path="/home/{{ main_user }}/scripts" state=directory mode=0775
+  tags: scripts
+
+- name: Upload scripts
+  template: src={{ item }}.j2
+            dest="/home/{{ main_user }}/scripts/{{ item }}"
+            mode=0775 owner="{{ main_user }}" group="{{ main_user }}"
+  with_items:
+    - sync_nas.sh
+    - playlists_creation.sh
+  tags: scripts
+
+# Sound Files Sync Script
+- name: Cron for sounds synchronisation script
   cron: name="Synchronisation of remote NAS"
         user="{{ main_user }}"
-        job="/home/{{ main_user }}/sync_nas.sh"
         minute=55
-  tags: nas_sync
+        job="/home/{{ main_user }}/scripts/sync_nas.sh"
+  tags: scripts
 
-- name: Run synchronisation right now, in background
-  shell: /home/{{ main_user }}/sync_nas.sh &
-  tags: nas_sync
+- name: Run synchronisation right now, in background (but wait 5s to at least retrieve some files!)
+  shell: sudo -u "{{ main_user }}" bash -c "(/home/{{ main_user }}/scripts/sync_nas.sh) & sleep 5"
+  when: airtime_install|changed
+  tags: scripts
+
+# Playlists Creation Script
+- name: Cron for M3U playlists creation script
+  cron: name="Creation of playlists"
+        user="{{ main_user }}"
+        hour=3
+        job="/home/{{ main_user }}/scripts/playlists_creation.sh"
+  tags: scripts
+
+- name: Run playlists creation right now, in background
+  shell: sudo -u "{{ main_user }}" bash -c "(/home/{{ main_user }}/scripts/playlists_creation.sh) &"
+  when: airtime_install|changed
+  tags: scripts
 
 ######################################################################
 # Soundcards settings
 ######################################################################
 
 - name: Make sure the M-Audio 24/96 ICE1712 is the first soundcard
-  sudo: yes
   lineinfile: dest=/etc/modprobe.d/alsa-base.conf
               line="{{ item }}"
   with_items:
@@ -181,7 +177,6 @@
 
 # alsa force-reload seems to always return status code 1 :-(
 - name: Reload ALSA configuration
-  sudo: yes
   command: alsa force-reload
   register: alsa_reload
   failed_when: "alsa_reload.rc != 1"
@@ -189,10 +184,10 @@
   tags: sound
 
 # Set sound volume
-- name: Set ALSA volume on our ICE1712 (only on first install)
+- name: Set ALSA volume on our ICE1712
   command: amixer -c0 set "{{ item.i }}" "{{ item.v }}" unmute
   with_items: soundcard_volume
-  when: airtime_install|changed
+  changed_when: false
   tags: sound
 
 ######################################################################
@@ -200,7 +195,6 @@
 ######################################################################
 
 - name: Remove unused packages
-  sudo: yes
   apt: name="{{ item }}" state=absent purge=yes
   with_items:
     - pulseaudio
@@ -208,11 +202,10 @@
   tags: airtime
 
 - name: Add sounds folder to Airtime watched folders
-  sudo: yes
-  command: "airtime-import --watch-add {{ sounds_path }}"
+  command: "airtime-import --watch-add '{{ music_path }}'"
   register: watch_add
   changed_when: "'successfully' in watch_add.stdout"
-  failed_when: "'not a directory' in watch_add.stdout"
+  failed_when: "'not a directory' in watch_add.stdout or 'Error' in watch_add.stdout"
   tags: airtime
 
 ######################################################################
@@ -225,7 +218,6 @@
 
 # FIXME OPUS plugin seems to prevent OGG files from being played :-(
 - name: AWFULHACK Retrieve path to OPUS Liquidsoap plugin
-  sudo: yes
   shell: dpkg -L liquidsoap-plugin-opus |grep opus.cmxs
   register: opus_file
   changed_when: false
@@ -234,7 +226,6 @@
     - airtime_postinstall
 
 - name: AWFULHACK Verify if OPUS Liquidsoap plugin exists
-  sudo: yes
   stat: path="{{ opus_file.stdout }}" get_md5=no get_checksum=no
   register: opus
   tags:
@@ -242,7 +233,6 @@
     - airtime_postinstall
 
 - name: AWFULHACK Remove OPUS Liquidsoap plugin which prevents playing OGG
-  sudo: yes
   command: mv "{{ opus_file.stdout }}" "{{ opus_file.stdout }}_BAK"
   when: opus.stat.exists
   tags:
@@ -251,7 +241,6 @@
 
 # FIXME Temporary fix for https://github.com/sourcefabric/Airtime/pull/82
 - name: Verify if airtime-liquidsoap starts too early regarding Apache (S91)
-  sudo: yes
   stat: path="/etc/rc2.d/S20airtime-liquidsoap" get_md5=no get_checksum=no
   register: starts_too_early
   tags:
@@ -259,7 +248,6 @@
     - airtime_postinstall
 
 - name: Set airtime-liquidsoap to start before Apache
-  sudo: yes
   command: mv "/etc/rc{{ item.rc }}.d/{{ item.old }}airtime-liquidsoap" "/etc/rc{{ item.rc }}.d/{{ item.new }}airtime-liquidsoap"
   with_items:
     - { rc: "0", old: "K20", new: "K08" }
@@ -287,7 +275,6 @@
 
 - name: Verify Airtime output is set to a device
   command: sudo -u postgres psql --quiet --no-align --tuples-only -c "SELECT value FROM cc_stream_setting WHERE keyname = 'output_sound_device'" airtime
-  sudo: yes
   register: psql_output_device
   changed_when: false
   failed_when: false
@@ -296,7 +283,6 @@
     - airtime_fmr
 
 - name: Set Airtime output to a device
-  sudo: yes
   command: sudo -u postgres psql --quiet --no-align --tuples-only -c "DELETE FROM cc_stream_setting WHERE keyname = 'output_sound_device' ; INSERT INTO cc_stream_setting ("keyname", "value", "type") VALUES ('output_sound_device', 'true', 'boolean');" airtime
   when: "'true' not in psql_output_device.stdout"
   tags:
@@ -309,7 +295,6 @@
 
 - name: Verify Airtime output is set to ALSA
   command: sudo -u postgres psql --quiet --no-align --tuples-only -c "SELECT value FROM cc_stream_setting WHERE keyname = 'output_sound_device_type'" airtime
-  sudo: yes
   register: psql_output_type
   changed_when: false
   failed_when: false
@@ -318,7 +303,6 @@
     - airtime_fmr
 
 - name: Set Airtime output to ALSA
-  sudo: yes
   command: sudo -u postgres psql --quiet --no-align --tuples-only -c "DELETE FROM cc_stream_setting WHERE keyname = 'output_sound_device_type' ; INSERT INTO cc_stream_setting ("keyname", "value", "type") VALUES ('output_sound_device_type', 'ALSA', 'string');" airtime
   when: "'ALSA' not in psql_output_type.stdout"
   tags:
@@ -331,7 +315,6 @@
 
 - name: Verify that Airtime stream 1 is disabled
   command: sudo -u postgres psql --quiet --no-align --tuples-only -c "SELECT value FROM cc_stream_setting WHERE keyname = 's1_enable'" airtime
-  sudo: yes
   register: psql_stream_1
   changed_when: false
   failed_when: false
@@ -340,7 +323,6 @@
     - airtime_fmr
 
 - name: Disable Airtime stream 1
-  sudo: yes
   command: sudo -u postgres psql --quiet --no-align --tuples-only -c "DELETE FROM cc_stream_setting WHERE keyname = 's1_enable' ; INSERT INTO cc_stream_setting ("keyname", "value", "type") VALUES ('s1_enable', 'false', 'boolean');" airtime
   when: "'false' not in psql_stream_1.stdout"
   tags:
@@ -354,27 +336,33 @@
 - name: Deploy Liquidsoap script
   template: src="liquidsoap_{{ program_code }}.liq.j2"
             dest="/home/{{ main_user }}/liquidsoap_{{ program_code }}.liq"
-            mode=0644
+            mode=0664 owner="{{ main_user }}" group="{{ main_user }}"
+            validate="airtime-liquidsoap --check-lib %s"
+  notify: Restart airtime-liquidsoap
   tags:
     - airtime
     - default_playlist
 
 - name: Include our default Liquidsoap playlist script into Airtime
-  sudo: yes
   lineinfile: dest=/usr/lib/airtime/pypo/bin/liquidsoap_scripts/ls_script.liq
               insertbefore="^default = amplify.*"
               line='%include "/home/{{ main_user }}/liquidsoap_{{ program_code }}.liq"'
+              #validate="airtime-liquidsoap --check %s"
+              # Check fails: At line 3, char 30: the variable log_file used
+              # here has not been previously defined.
+  notify: Restart airtime-liquidsoap
   tags:
     - airtime
     - default_playlist
 
 - name: Comment default Liquidsoap playlist into Airtime
-  sudo: yes
   lineinfile: dest=/usr/lib/airtime/pypo/bin/liquidsoap_scripts/ls_script.liq
               regexp="{{ item.r }}" line="{{ item.l }}" backrefs=yes
+              #validate="airtime-liquidsoap --check %s"
   with_items:
     - { r: '^(default = amplify.*)', l: '#\1' }
     #- { r: '^(default = rewrite_metadata.*)', l: '#\1' }
+  notify: Restart airtime-liquidsoap
   tags:
     - airtime
     - default_playlist

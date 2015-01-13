@@ -4,16 +4,35 @@
 program_name: "FMR"
 program_code: fmr
 main_user: "{{ program_code }}"
-# NOTE: Don't forget to create the file template/liquidsoap_{{ program_code }}.ls.j2
+# To generate password: mkpasswd --method=SHA-512
+main_user_pass_sha512: "$6$vvtP72EFkul9L2.$gp2RVOvUtvMSlkD07.O3Nj5aVo9NOl9z9xKbXH6cj2ZyoegwspeVolYYT9dZwY/adv0CfZiPjyZQpHtVQA2OA/"
+
+######################################################################
+# NOTE: Don't forget to create template/liquidsoap_{{ program_code }}.ls.j2
+######################################################################
+
+# If configuration changed, shall we restart (and interrupt) the stream? Or
+# will you do it manually?
+interrupt_stream_ok: true
+
+security_file: ""
+#security_file: "securite_{{ program_code }}.ogg"
 
 # storage_disk will be mounted on storage_mount
 storage_disk: "/dev/sdb"
 storage_mount: "/mnt/localdisk"
 
-# airtime_path MUST be overrided into a {group,host}_vars file, because it's
-# already been set by roles/airtime/defaults.
+# NOTE: "airtime_path" MUST be overrided into a {group,host}_vars file, because
+# it has already been set by roles/airtime/defaults.
 #airtime_path: ""
-sounds_path: "{{ storage_mount }}/discotheque"
+library_path: "{{ storage_mount }}/discotheque"
+# To simplify templates management, add a bunch of path variables:
+music_path: "{{ library_path }}/Fond musical"
+rotation_path: "{{ library_path }}/Fond rotation"
+playlists_path: "{{ library_path }}/Playlists"
+jingles_path: "{{ library_path }}/Jingles"
+publicites_path: "{{ library_path }}/Publicites"
+tophoraires_path: "{{ library_path }}/Top horaires"
 
 nas_mount: "/mnt/nas"
 nas_hostname: "192.168.1.100"
@@ -24,6 +43,7 @@ soundcard_1: "snd-ice1712"   # M2496 [M Audio Audiophile 24/96], device 0: ICE17
 soundcard_2: "snd-hda-intel" # MID [HDA Intel MID]
 
 soundcard_volume:
-  - { i: "DAC,0", v: "50%" }
-  - { i: "DAC,1", v: "50%" }
+  - { i: "DAC,0", v: "75%" }
+  - { i: "DAC,1", v: "75%" }
 
+# vim: set ft=ansible

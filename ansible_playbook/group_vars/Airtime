@@ -1,5 +1,0 @@
-storage_mount: "/mnt/localdisk"
-airtime_path: "{{ storage_mount }}/airtime"
-
-# echo -n "MotDePasse" |md5sum
-airtime_pass_md5: "058907f77901800f0e8fab406d4880fa"

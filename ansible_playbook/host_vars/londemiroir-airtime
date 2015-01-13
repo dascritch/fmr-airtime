@@ -1,6 +1,19 @@
+---
 storage_disk: "/dev/sdb"
+storage_mount: "/mnt/localdisk"
+airtime_path: "{{ storage_mount }}/airtime"
 
 program_name: "L'Onde Miroir"
 program_code: londemiroir
 main_user: "{{ program_code }}"
-# NOTE: Don't forget to create the file template/liquidsoap_{{ program_code }}.ls.j2
+# To generate password: mkpasswd --method=SHA-512
+main_user_pass_sha512: "$6$vvtP72EFkul9L2.$gp2RVOvUtvMSlkD07.O3Nj5aVo9NOl9z9xKbXH6cj2ZyoegwspeVolYYT9dZwY/adv0CfZiPjyZQpHtVQA2OA/"
+
+# echo -n "MotDePasse" |md5sum
+airtime_pass_md5: "bcf19cbb68ac0bad2fb0adb24840f2fc"
+
+######################################################################
+# NOTE: Don't forget to create template/liquidsoap_{{ program_code }}.ls.j2
+######################################################################
+
+# vim: set ft=ansible
