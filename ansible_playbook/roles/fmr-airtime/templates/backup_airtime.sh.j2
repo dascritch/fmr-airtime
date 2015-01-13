@@ -1,0 +1,80 @@
+#!/bin/bash
+# ATTENTION : fichier géré par Ansible ! Les modifications seront perdues.
+
+# How many backup files shall we keep?
+NB_KEEP=14
+
+# List of dir to backup, one per line.
+# FIXME: Must not contain any space!
+BACKUP_DIRS="
+/etc/airtime
+"
+
+OWNER="{{ main_user }}"
+GROUP="{{ main_user }}"
+
+DEST_DIR="{{ storage_mount }}"
+
+# Basename of the backup files
+BASE_NAME="backup_airtime-"
+# Extension (see also the "tar" command below)
+BASE_EXT=".tar.bz2"
+
+DEST_NAME="${BASE_NAME}$(date +%F_%H-%M-%S)"
+DEST_FILE="${DEST_NAME}${BASE_EXT}"
+
+######################################################################
+
+if [ $(whoami) != 'root' ]; then
+    echo "ERROR: Must be executed by root."
+    exit 1
+fi
+
+cd /tmp
+mkdir "$DEST_NAME"
+cd "$DEST_NAME"
+
+######################################################################
+# Database
+
+sudo -u postgres pg_dumpall | gzip -c > db.dump.gz
+
+# Restore helper
+cat <<"EOF" > db.restore.sh
+#!/bin/bash
+echo ''
+echo "ARE YOU SURE? You are going to drop your Airtime DB!"
+echo "Press Ctrl-C if you want to quit, or Enter to continue."
+read
+dump="$(cd $(dirname $0); pwd)/db.dump.gz"
+if [ -s "$dump" ]; then
+    sudo -u postgres dropdb airtime
+    gunzip -c "$dump" | sudo -u postgres psql -f -
+fi
+EOF
+chmod +x db.restore.sh
+
+######################################################################
+# Folders
+
+touch "PLEASE_UNTAR_AS_ROOT_TO_PRESERVE_PERMISSIONS"
+
+for dir in $BACKUP_DIRS; do
+    rsync -qaR $dir .
+done
+
+######################################################################
+# Compress and move the final file
+
+cd ..
+tar -cjf "${DEST_FILE}" "$DEST_NAME"
+rm -rf "$DEST_NAME"
+
+chown $OWNER:$GROUP ${DEST_FILE}
+
+# Remove oldest file(s)
+while [ $(find "$DEST_DIR" -name "${BASE_NAME}*${BASE_EXT}" | wc -l) -gt 14 ]; do
+    rm "$(find "$DEST_DIR" -name "${BASE_NAME}*${BASE_EXT}" | sort -r | tail -1)"
+done
+
+mv "${DEST_FILE}" "$DEST_DIR"

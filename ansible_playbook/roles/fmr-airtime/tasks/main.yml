@@ -121,7 +121,10 @@
   changed_when: false
   tags: mounts
 
+######################################################################
 # Scripts deployment
+######################################################################
+
 - name: Scripts directory creation
   file: path="/home/{{ main_user }}/scripts" state=directory mode=0775
   tags: scripts
@@ -133,8 +136,11 @@
   with_items:
     - sync_nas.sh
     - playlists_creation.sh
+    - backup_airtime.sh
   tags: scripts
+  tags: testme
 
+#=====================================================================
 # Sound Files Sync Script
 - name: Cron for sounds synchronisation script
   cron: name="Synchronisation of remote NAS"
@@ -148,6 +154,7 @@
   when: airtime_install|changed
   tags: scripts
 
+#=====================================================================
 # Playlists Creation Script
 - name: Cron for M3U playlists creation script
   cron: name="Creation of playlists"
@@ -160,6 +167,16 @@
   shell: sudo -u "{{ main_user }}" bash -c "(/home/{{ main_user }}/scripts/playlists_creation.sh) &"
   when: airtime_install|changed
   tags: scripts
+
+#=====================================================================
+# Backup script
+- name: Cron for Airtime Backup script
+  cron: name="Airtime backup"
+        user="root"
+        hour=4
+        job="/home/{{ main_user }}/scripts/backup_airtime.sh"
+  tags: scripts
+  tags: testme
 
 ######################################################################
 # Soundcards settings
