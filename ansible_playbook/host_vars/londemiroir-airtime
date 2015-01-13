@@ -16,4 +16,4 @@ airtime_pass_md5: "bcf19cbb68ac0bad2fb0adb24840f2fc"
 # NOTE: Don't forget to create template/liquidsoap_{{ program_code }}.ls.j2
 ######################################################################
 
-# vim: set ft=ansible
+# vim: ft=ansible

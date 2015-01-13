@@ -46,4 +46,4 @@ soundcard_volume:
   - { i: "DAC,0", v: "75%" }
   - { i: "DAC,1", v: "75%" }
 
-# vim: set ft=ansible
+# vim: ft=ansible

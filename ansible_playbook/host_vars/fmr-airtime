@@ -20,4 +20,4 @@ nas_mount: "/mnt/nas"
 nas_hostname: "192.168.1.100"
 nas_share: "Telechargements/discotheque"
 
-# vim: set ft=ansible
+# vim: ft=ansible
