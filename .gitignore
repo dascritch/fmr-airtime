@@ -6,4 +6,4 @@ adhoc/[Ll]ib
 adhoc/[Ss]cripts
 adhoc/[Ll]ocal
 pyvenv.cfg
-host_vars/airtime
+ansible_playbook/host_vars/airtime
