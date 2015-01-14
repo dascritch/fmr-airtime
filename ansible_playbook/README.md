@@ -24,7 +24,7 @@ ssh deploy@<fqdn_airtime> hostname -f
 
 ```bash
 cd ~/devel/
-git clone git://github.com/ansible/ansible.git
+git clone --recursive git://github.com/ansible/ansible.git
 ```
 
 # Playbook Airtime
@@ -33,7 +33,7 @@ Récupérer ce playbook :
 
 ```bash
 cd ~/devel/
-git clone git@github.com:dascritch/fmr-airtime.git
+git clone --recursive git@github.com:dascritch/fmr-airtime.git
 cd fmr-airtime/ansible_playbook
 ```
 
