@@ -127,6 +127,7 @@
 
 - name: Scripts directory creation
   file: path="/home/{{ main_user }}/scripts" state=directory mode=0775
+        mode=0775 owner="{{ main_user }}" group="{{ main_user }}"
   tags: scripts
 
 - name: Upload scripts
