@@ -8,12 +8,11 @@ Procédure suivie pour installer Ubuntu Server 14.04.1 pour FMR.
 
 # Préparation du preseed
 
-- Déposer le fichier `fmr-ubuntu.preseed` ci-joint à la racine de la clé USB ;
-
-Pour générer le mot de passe chiffré : `openssl passwd -1`
-
-- Modifier le fichier `syslinux.cfg` pour que sa première option de démarrage,
-- après `timeout`, soit :
+- Modifier le fichier `fmr-ubuntu.preseed` [ci-joint](fmr-ubuntu.preseed) pour changer le mot de passe de l'utilisateur `deploy` :
+  - Il s'agit de l'option `d-i passwd/user-password-crypted password`
+  - Pour générer un nouveau mot de passe chiffré : `openssl passwd -1`
+- Le sauver puis le déposer à la racine de la clé USB ;
+- Modifier le fichier `syslinux.cfg` pour que sa première option de démarrage, après `timeout`, soit :
 
 ```
 label fmr
