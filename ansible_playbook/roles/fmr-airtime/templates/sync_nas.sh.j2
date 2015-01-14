@@ -16,7 +16,7 @@ echo $$ > "$PID"
 
 mount "$SRC" 2>/dev/null \
   && rsync -aq --del \
-    --no-perms --chmod="ug=rwX,o=rX" \
+    --chmod="ug=rwX,o=rX" \
     --exclude=lost+found \
     "$SRC" "$DST"
 
