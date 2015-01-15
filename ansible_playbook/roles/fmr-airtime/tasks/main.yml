@@ -89,6 +89,9 @@
         dest="/home/{{ main_user }}/{{ security_file }}"
         mode=0664 owner="{{ main_user }}" group="{{ main_user }}"
   when: security_file is defined and security_file != ""
+  tags:
+    - filesystem
+    - sound
 
 ######################################################################
 # Sound files synchronisation from remote NAS
@@ -199,7 +202,7 @@
   tags: sound
 
 # Set sound volume
-- name: Set ALSA volume on our ICE1712
+- name: Set ALSA volumes
   command: amixer -c"{{ item.0.index }}" set "{{ item.1.i }}" "{{ item.1.v }}" unmute
   with_subelements:
     - soundcards
