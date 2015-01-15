@@ -1,28 +1,43 @@
 #!/bin/bash
 # ATTENTION : fichier géré par Ansible ! Les modifications seront perdues.
 
-SRC="{{ nas_mount }}/"  # The trailing "/" is important!
+# TODO: Create a logrotate.d entry for $LOG
+
+NAS_MOUNT="{{ nas_mount }}"
+SRC="${NAS_MOUNT}/"  # The trailing "/" is important!
 DST="{{ library_path }}"
 
-PID="/var/lock/sync_nas.pid"
+LOG="/var/tmp/sync_nas.log"
+LOCK="/var/lock/sync_nas.pid"
+PID="$$"
 
-# Kill a previously launched instance
-if [ -s "$PID" ]; then
-  kill $(cat "$PID")
+######################################################################
+
+echo "[$PID] START  $(date)" >> "$LOG"
+
+# Verify it's not already running
+if [ -s "$LOCK" ]; then
+  if ps -p "$(cat "$LOCK")" >/dev/null 2>&1; then
+      # It's already running! Quit now.
+      echo "[$PID] END   Already running by $(cat "$LOCK")" >> "$LOG"
+      exit
+  fi
 fi
 
-# Keep track of our PID so we can kill it later
-echo $$ > "$PID"
+######################################################################
 
-mount "$SRC" 2>/dev/null \
-  && rsync -aq --del \
-    --chmod="ug=rwX,o=rX" \
-    --exclude=lost+found \
-    "$SRC" "$DST"
+# Keep track of LOCK so it doesn't run twice
+echo $PID > "$LOCK"
 
-# Unmount NAS even if rsync failed
-umount "$SRC" 2>/dev/null
+mount "$NAS_MOUNT" 2>/dev/null
+if grep -q "$NAS_MOUNT" /proc/mounts; then
+    rsync -a --del --exclude=lost+found --log-file="$LOG" \
+        --chmod="ug=rwX,o=rX" "$SRC" "$DST"
+    umount "$NAS_MOUNT" 2>/dev/null
+fi
 
-# Ended normally, remove our PID file
-rm "$PID"
+# Ended normally, remove LOCK file
+rm "$LOCK"
+
+echo -e "[$PID] END    $(date)\n" >> "$LOG"
 
