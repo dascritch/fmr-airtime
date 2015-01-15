@@ -139,7 +139,6 @@
     - playlists_creation.sh
     - backup_airtime.sh
   tags: scripts
-  tags: testme
 
 #=====================================================================
 # Sound Files Sync Script
@@ -177,34 +176,34 @@
         hour="4" minute="0"
         job="/home/{{ main_user }}/scripts/backup_airtime.sh"
   tags: scripts
-  tags: testme
 
 ######################################################################
 # Soundcards settings
 ######################################################################
 
-- name: Make sure the M-Audio 24/96 ICE1712 is the first soundcard
+- name: Set soundcards order
   lineinfile: dest=/etc/modprobe.d/alsa-base.conf
-              line="{{ item }}"
-  with_items:
-    - "# Hardcode the sort order of soundcards:"
-    - "options {{ soundcard_1 }} index=0"
-    - "options {{ soundcard_2 }} index=1"
+              regexp="^options {{ item.driver }}"
+              line="options {{ item.driver }} index={{ item.index }}"
+  with_items: soundcards
   register: soundcards_order
   tags: sound
 
-# alsa force-reload seems to always return status code 1 :-(
+# "alsa force-reload" seems to always return status code 1 :-(
 - name: Reload ALSA configuration
   command: alsa force-reload
   register: alsa_reload
   failed_when: "alsa_reload.rc != 1"
   when: soundcards_order|changed
+  notify: Restart airtime-liquidsoap
   tags: sound
 
 # Set sound volume
 - name: Set ALSA volume on our ICE1712
-  command: amixer -c0 set "{{ item.i }}" "{{ item.v }}" unmute
-  with_items: soundcard_volume
+  command: amixer -c"{{ item.0.index }}" set "{{ item.1.i }}" "{{ item.1.v }}" unmute
+  with_subelements:
+    - soundcards
+    - volume
   changed_when: false
   tags: sound
 

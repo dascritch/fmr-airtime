@@ -4,6 +4,16 @@ Paramétrages du service de diffusion continue de [Radio FMR](http://radio-fmr.n
 
 [Document de travail temporaire](https://lite5.framapad.org/p/FMR-Airtime-Howto)
 
+## Hardware
+
+Un quad-core Intel Core i3 @ 3.07GHz avec 8 Go de RAM est _largement_ suffisant.
+
+La carte son est une [Audiophile
+2496](http://www.m-audio.com/products/view/audiophile-2496), « 4-In/4-Out Audio
+Card with MIDI and Digital I/O ». Backupée en cas de besoin par le chipset de la
+carte mère : modifier la variable `soundcards` pour intervertir les index, et
+rejouer le playbook.
+
 ## Ubuntu
 
 L'installation d'Ubuntu Server sur la machine se fait automatiquement.

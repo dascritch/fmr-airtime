@@ -38,12 +38,18 @@ nas_mount: "/mnt/nas"
 nas_hostname: "192.168.1.100"
 nas_share: "Telechargements/discotheque"
 
-# Driver of the main soundcard
-soundcard_1: "snd-ice1712"   # M2496 [M Audio Audiophile 24/96], device 0: ICE1712
-soundcard_2: "snd-hda-intel" # MID [HDA Intel MID]
-
-soundcard_volume:
-  - { i: "DAC,0", v: "75%" }
-  - { i: "DAC,1", v: "75%" }
+# Soundcards prefered order and volume.
+# NOTE: Soundcards index must start at 0.
+# Use "amixer" to know what volume identifiers to use.
+soundcards:
+  - index: 0
+    driver: "snd-ice1712"     # M2496 [M Audio Audiophile 24/96]
+    volume:
+      - { i: "DAC,0", v: "75%" }
+      - { i: "DAC,1", v: "75%" }
+  - index: 1
+    driver: "snd-hda-intel"   # MID [HDA Intel MID]
+    volume:
+      - { i: "Master,0", v: "75%" }
 
 # vim: ft=ansible
