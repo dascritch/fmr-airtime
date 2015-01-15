@@ -146,7 +146,7 @@
 - name: Cron for sounds synchronisation script
   cron: name="Synchronisation of remote NAS"
         user="{{ main_user }}"
-        minute=55
+        hour="*" minute="55"
         job="/home/{{ main_user }}/scripts/sync_nas.sh"
   tags: scripts
 
@@ -160,7 +160,7 @@
 - name: Cron for M3U playlists creation script
   cron: name="Creation of playlists"
         user="{{ main_user }}"
-        hour=3
+        hour="3" minute="0"
         job="/home/{{ main_user }}/scripts/playlists_creation.sh"
   tags: scripts
 
@@ -174,7 +174,7 @@
 - name: Cron for Airtime Backup script
   cron: name="Airtime backup"
         user="root"
-        hour=4
+        hour="4" minute="0"
         job="/home/{{ main_user }}/scripts/backup_airtime.sh"
   tags: scripts
   tags: testme
