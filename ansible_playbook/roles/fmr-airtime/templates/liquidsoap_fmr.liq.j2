@@ -26,12 +26,12 @@ rota_lente =    playlist(reload=21600, "{{ rotation_path }}/Lente")
 # FIXME: Est-ce nécessaire ?
 # Programmation par genres - Style musical en fonction de l'heure
 # Fichiers M3U générés automatiquement par le script playlists_creation.sh
-# jazz = playlist(reload=21600, "{{ playlists_path }}/Jazz.m3u")
-# rock = playlist(reload=21600, "{{ playlists_path }}/Rock.m3u")
-# metal = playlist(reload=21600, "{{ playlists_path }}/Metal.m3u")
-# classical = playlist(reload=21600, "{{ playlists_path }}/Classical.m3u")
-# chanson = playlist(reload=21600, "{{ playlists_path }}/Chanson.m3u")
-# hiphop = playlist(reload=21600, "{{ playlists_path }}/Hip-Hop.m3u")
+#jazz = playlist(reload=21600, "{{ playlists_path }}/Jazz.m3u")
+#rock = playlist(reload=21600, "{{ playlists_path }}/Rock.m3u")
+#metal = playlist(reload=21600, "{{ playlists_path }}/Metal.m3u")
+#classical = playlist(reload=21600, "{{ playlists_path }}/Classical.m3u")
+#chanson = playlist(reload=21600, "{{ playlists_path }}/Chanson.m3u")
+#hiphop = playlist(reload=21600, "{{ playlists_path }}/Hip-Hop.m3u")
 
 # Jingles
 # - Au moins un jingle toutes les 45m (2700s)
@@ -65,17 +65,20 @@ rotations = rotate(weights=[6, 3, 1], [rota_forte, rota_moyenne, rota_lente])
 
 # FIXME: Est-ce nécessaire ?
 # Programmations horaires
-# genres = switch([
-#                 ({ 6h-12h },  random([classical, chanson]) ),
-#                 ({ 12h-18h }, random([rock, jazz]) ),
-#                 ({ 18h-24h }, random([metal]) ),
-#                 ({ 0h-6h },   random([hiphop]) ),
-#             ])
+#genres = switch([
+#                ({ 6h-12h },  random([classical, chanson]) ),
+#                ({ 12h-18h }, random([rock, jazz]) ),
+#                ({ 18h-24h }, random([metal]) ),
+#                ({ 0h-6h },   random([hiphop]) ),
+#            ])
 
 # Ajoute les programmations si dispo, sinon se rabat sur le fond musical
-music = fallback([
-            # genres,
-            rotations,
+# - track_sensitive=false pour ne pas rester bloqué sur la liste "tout" ad vitam æternam!
+music = fallback(track_sensitive=false, [
+            fallback(track_sensitive=true, [
+                #genres,
+                rotations,
+                ]),
             tout,
         ])
 
