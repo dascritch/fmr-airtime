@@ -26,7 +26,7 @@ fi
 
 ######################################################################
 
-# Keep track of LOCK so it doesn't run twice
+# Keep track of PID to not run it twice
 echo $PID > "$LOCK"
 
 mount "$NAS_MOUNT" 2>/dev/null
