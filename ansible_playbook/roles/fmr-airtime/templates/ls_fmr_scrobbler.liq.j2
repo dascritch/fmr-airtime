@@ -36,7 +36,10 @@ def scrobble(m) =
     # Normally there is nothing to change below
     ######################################################################
 
-    show       = url.encode(m["show_name"])
+    #station    = url.encode(!station_name)
+    # NOTE: "show" value is not empty between two shows, so the fallback
+    # "default" playlist tracks appears to belong to previous show :-(
+    #show       = url.encode(!show_name)
     artist     = url.encode(m["artist"])
     album      = url.encode(m["album"])
     title      = url.encode(m["title"])
@@ -46,7 +49,8 @@ def scrobble(m) =
         "?partnerId="    ^ partnerId ^
         "&partnerKey="   ^ partnerKey ^
         "&id="           ^ id ^
-        "&show="         ^ show ^
+        #"&station="      ^ station ^
+        #"&show="         ^ show ^
         "&artist="       ^ artist ^
         "&album="        ^ album ^
         "&title="        ^ title ^

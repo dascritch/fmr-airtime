@@ -13,7 +13,10 @@ if($partnerId != "{{ scrobbler_partner_id }}"
 }
 
 # Retrieve info
-$show       = htmlspecialchars($_REQUEST["show"]);
+#$station    = htmlspecialchars($_REQUEST["station"]);
+# NOTE: "show" value is not empty between two shows, so the fallback "default"
+# playlist tracks appears to belong to previous show :-(
+#$show       = htmlspecialchars($_REQUEST["show"]);
 $artist     = htmlspecialchars($_REQUEST["artist"]);
 $album      = htmlspecialchars($_REQUEST["album"]);
 $title      = htmlspecialchars($_REQUEST["title"]);
@@ -28,7 +31,8 @@ if ($commercial != true) {
     $cur = file_get_contents($file);
 
     $csv = '"' . date("c") . '";'
-         . '"' . $show . '";'
+         #. '"' . $station . '";'
+         #. '"' . $show . '";'
          . '"' . $artist . '";'
          . '"' . $album . '";'
          . '"' . $title . '";'
