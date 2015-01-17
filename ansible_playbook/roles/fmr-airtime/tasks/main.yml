@@ -350,23 +350,40 @@
     - airtime_fmr
 
 #=====================================================================
-# FMR default playlist
+# Liquidsoap customisations
 #=====================================================================
 
-- name: Deploy Liquidsoap script
-  template: src="liquidsoap_{{ program_code }}.liq.j2"
-            dest="/home/{{ main_user }}/liquidsoap_{{ program_code }}.liq"
+- name: Create Liquidsoap scripts destination folder
+  file: path="/home/{{ main_user }}/liquidsoap_scripts"
+        state=directory
+        mode=0775 owner="{{ main_user }}" group="{{ main_user }}"
+  tags:
+    - airtime
+    - default_playlist
+    - scrobbler
+
+- name: Deploy Liquidsoap scripts
+  template: src="{{ item }}.j2"
+            dest="/home/{{ main_user }}/liquidsoap_scripts/{{ item }}"
             mode=0664 owner="{{ main_user }}" group="{{ main_user }}"
             validate="airtime-liquidsoap --check-lib %s"
+  with_items:
+    - "ls_{{ program_code }}.liq"
+    - "ls_{{ program_code }}_scrobbler.liq"
   notify: Restart airtime-liquidsoap
   tags:
     - airtime
     - default_playlist
+    - scrobbler
+
+#---------------------------------------------------------------------
+# Liquidsoap: Setup the fallback default playlist
+#---------------------------------------------------------------------
 
 - name: Include our default Liquidsoap playlist script into Airtime
   lineinfile: dest=/usr/lib/airtime/pypo/bin/liquidsoap_scripts/ls_script.liq
               insertbefore="^default = amplify.*"
-              line='%include "/home/{{ main_user }}/liquidsoap_{{ program_code }}.liq"'
+              line='%include "/home/{{ main_user }}/liquidsoap_scripts/ls_{{ program_code }}.liq"'
               #validate="airtime-liquidsoap --check %s"
               # Check fails: At line 3, char 30: the variable log_file used
               # here has not been previously defined.
@@ -381,9 +398,57 @@
               #validate="airtime-liquidsoap --check %s"
   with_items:
     - { r: '^(default = amplify.*)', l: '#\1' }
-    #- { r: '^(default = rewrite_metadata.*)', l: '#\1' }
   notify: Restart airtime-liquidsoap
   tags:
     - airtime
     - default_playlist
+
+#---------------------------------------------------------------------
+# Liquidsoap: Setup the scrobbler
+#---------------------------------------------------------------------
+
+- name: Create Scrobbler API destination folder
+  file: path="/usr/share/airtime/public/{{ scrobbler_path }}"
+        state=directory
+        mode=0775 owner="www-data" group="www-data"
+  tags:
+    - airtime
+    - scrobbler
+
+- name: Deploy scrobbler PHP file
+  template: src="scrobbler.php.j2"
+            dest="/usr/share/airtime/public/{{ scrobbler_path }}/{{ scrobbler_file }}"
+            mode=0664 owner="www-data" group="www-data"
+  tags:
+    - airtime
+    - scrobbler
+
+- name: Include our scrobbler script into Airtime
+  lineinfile: dest=/usr/lib/airtime/pypo/bin/liquidsoap_scripts/ls_script.liq
+              insertbefore="^if output_sound_device then"
+              line='{{ item }}'
+              #validate="airtime-liquidsoap --check %s"
+  with_items:
+    - '%include "/home/{{ main_user }}/liquidsoap_scripts/ls_{{ program_code }}_scrobbler.liq"'
+    #- 's = on_track(scrobble, s)'
+    - 's = on_metadata(scrobble, s)'
+  notify: Restart airtime-liquidsoap
+  tags:
+    - airtime
+    - scrobbler
+
+# Here we simply tell LS to stop rewriting the "title" metadata to "Offline".
+# Instead (because the ref_off_air_meta variable has already be defined and
+# must be used...) lets rewrite something else, like the "comment" tag... :-/
+- name: Stop rewriting metadata when Offline
+  lineinfile: dest=/usr/lib/airtime/pypo/bin/liquidsoap_scripts/ls_script.liq
+              regexp="{{ item.r }}" line="{{ item.l }}" backrefs=yes
+              #validate="airtime-liquidsoap --check %s"
+  with_items:
+    - { r: '^(default = rewrite_metadata.*)title(.*)',
+        l: '\1comment\2' }
+  notify: Restart airtime-liquidsoap
+  tags:
+    - airtime
+    - scrobbler
 

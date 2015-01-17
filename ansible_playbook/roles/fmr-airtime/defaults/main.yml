@@ -7,6 +7,14 @@ main_user: "{{ program_code }}"
 # To generate password: mkpasswd --method=SHA-512
 main_user_pass_sha512: "$6$vvtP72EFkul9L2.$gp2RVOvUtvMSlkD07.O3Nj5aVo9NOl9z9xKbXH6cj2ZyoegwspeVolYYT9dZwY/adv0CfZiPjyZQpHtVQA2OA/"
 
+scrobbler_server: "http://localhost"
+scrobbler_path: "scrobbler-api"
+scrobbler_file: "scrobbler.php"
+scrobbler_url: "{{ scrobbler_server }}/{{ scrobbler_path }}/{{ scrobbler_file }}"
+scrobbler_partner_id: "Override_Me"
+scrobbler_partner_key: "Override_Me"
+scrobbler_id: ""
+
 ######################################################################
 # NOTE: Don't forget to create template/liquidsoap_{{ program_code }}.ls.j2
 ######################################################################

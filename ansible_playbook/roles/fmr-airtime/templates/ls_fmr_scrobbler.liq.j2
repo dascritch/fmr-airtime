@@ -1,0 +1,65 @@
+# ATTENTION : fichier géré par Ansible ! Les modifications seront perdues.
+
+# Based on Voisses Tech's works:
+# https://forum.sourcefabric.org/discussion/comment/30873#Comment_30873
+
+# Usage:
+# - Modify Airtime configuration file:
+# /usr/lib/airtime/pypo/bin/liquidsoap_scripts/ls_script.liq
+#
+# - If overriding the "default" playlist then you must stop to rewrite metadata
+# to "Offline" string. Modify around line 160 to keep the "title" metadata:
+##default = rewrite_metadata([("title", !ref_off_air_meta)], default)
+#default = rewrite_metadata([("comment", !ref_off_air_meta)], default)
+#
+# - Then just include this file and call the scrobble() method on the stream
+# variable. Around line 320, add these lines:
+#%include "/path/to/liquidsoap_scrobbler.liq"
+#s = on_track(scrobble, s)
+
+def scrobble(m) =
+
+    ######################################################################
+    # NOTE: Change these variables to your own values
+    ######################################################################
+
+    #partnerId  = "ZhQmyoLy"
+    partnerId  = "{{ scrobbler_partner_id }}"
+    #partnerKey = "ZRDirLWnji"
+    partnerKey = "{{ scrobbler_partner_key }}"
+    #id         = "s1234567"
+    id         = "{{ scrobbler_id }}"
+    #api_server = "http://air.radiotime.com/Playing.ashx"
+    api_server = "{{ scrobbler_url }}"
+
+    ######################################################################
+    # Normally there is nothing to change below
+    ######################################################################
+
+    show       = url.encode(m["show_name"])
+    artist     = url.encode(m["artist"])
+    album      = url.encode(m["album"])
+    title      = url.encode(m["title"])
+    commercial = url.encode(m["commercial"])
+
+    url =(api_server ^
+        "?partnerId="    ^ partnerId ^
+        "&partnerKey="   ^ partnerKey ^
+        "&id="           ^ id ^
+        "&show="         ^ show ^
+        "&artist="       ^ artist ^
+        "&album="        ^ album ^
+        "&title="        ^ title ^
+        "&commercial="   ^ commercial
+        )
+
+    # Match these Values appearing at the console  with the tunein Air Api or
+    # use the command.
+    log("Scrobbler URL: " ^ url)
+
+    # Now with just URL
+    ignore(http.get(url))
+
+end
+
+# vim: ft=ruby

@@ -1,0 +1,43 @@
+<?php
+# ATTENTION : fichier géré par Ansible ! Les modifications seront perdues.
+# vim: ft=php
+
+$partnerId  = htmlspecialchars($_REQUEST["partnerId"]);
+$partnerKey = htmlspecialchars($_REQUEST["partnerKey"]);
+$id         = htmlspecialchars($_REQUEST["id"]);
+
+# Verify it's the client we expect
+if($partnerId != "{{ scrobbler_partner_id }}"
+&& $partnerKey != "{{ scrobbler_partner_key }}") {
+    exit;
+}
+
+# Retrieve info
+$show       = htmlspecialchars($_REQUEST["show"]);
+$artist     = htmlspecialchars($_REQUEST["artist"]);
+$album      = htmlspecialchars($_REQUEST["album"]);
+$title      = htmlspecialchars($_REQUEST["title"]);
+$commercial = htmlspecialchars($_REQUEST["commercial"]);
+
+# Output the information but not for Jingles, etc.
+if ($commercial != true) {
+    # State the file to open with existing content
+    $file = '/tmp/liquidsoap-now_playing.csv';
+
+    # Open the file to get existing content
+    $cur = file_get_contents($file);
+
+    $csv = '"' . date("c") . '";'
+         . '"' . $show . '";'
+         . '"' . $artist . '";'
+         . '"' . $album . '";'
+         . '"' . $title . '";'
+         . "\n";
+
+    # Append the New Information to the file
+    $cur .= $csv;
+
+    # Write the contents back to the file
+    file_put_contents($file, $cur);
+}
+

@@ -39,16 +39,20 @@ rota_lente =    playlist(reload=21600, "{{ rotation_path }}/Lente")
 jingles = playlist(reload=21600, "{{ jingles_path }}")
 # Note: "delay" est contradictoire avec le "weights" de rotate().
 jingles = delay(2700., jingles)
+# Le tag "commercial" est utilisé par des scrobblers comme TuneIn.
+jingles = rewrite_metadata([("commercial","true")], jingles)
 
 # Publicités
 # - Au moins une pub toutes les 15m (900s)
 # - Recharge la playlist toutes les 2h (7200s)
 publicites = playlist(reload=7200, "{{ publicites_path }}")
 publicites = delay(900., publicites)
+publicites = rewrite_metadata([("commercial","true")], publicites)
 
 # Top horaire
 # - Recharge la playlist toutes les 6h (21600s)
 tophoraire = playlist(reload=21600, "{{ tophoraires_path }}")
+tophoraire = rewrite_metadata([("commercial","true")], tophoraire)
 
 {% if security_file %}
 # Sécurité
@@ -112,3 +116,4 @@ radio = smooth_add(
 # Airtime diffuse la playlist "default" quand aucune émission n'est programmée
 default = mksafe(radio)
 
+# vim: ft=ruby
