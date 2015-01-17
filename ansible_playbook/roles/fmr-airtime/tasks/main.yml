@@ -5,7 +5,7 @@
 # Packages
 ######################################################################
 
-- name: Install packages required for our Airtime
+- name: Install packages required for our own Airtime
   # Update cache if older than 1 day
   apt: name={{ item }} state=latest update_cache=yes cache_valid_time=86400
   with_items:
@@ -19,7 +19,8 @@
     - convmv
     - cifs-utils
     - fapg
-    #- festival
+    - jq
+    - bc
   tags: packages
 
 ######################################################################
@@ -129,7 +130,7 @@
 ######################################################################
 
 - name: Scripts directory creation
-  file: path="/home/{{ main_user }}/scripts" state=directory mode=0775
+  file: path="/home/{{ main_user }}/scripts" state=directory
         mode=0775 owner="{{ main_user }}" group="{{ main_user }}"
   tags: scripts
 
@@ -141,6 +142,7 @@
     - sync_nas.sh
     - playlists_creation.sh
     - backup_airtime.sh
+    - export_widget_data.sh
   tags: scripts
 
 #=====================================================================
@@ -154,7 +156,7 @@
 
 - name: Run synchronisation right now, in background (but wait 5s to at least retrieve some files!)
   shell: sudo -u "{{ main_user }}" bash -c "(/home/{{ main_user }}/scripts/sync_nas.sh) & sleep 5"
-  when: airtime_install|changed
+  when: airtime_install is defined and airtime_install|changed
   tags: scripts
 
 #=====================================================================
@@ -168,7 +170,7 @@
 
 - name: Run playlists creation right now, in background
   shell: sudo -u "{{ main_user }}" bash -c "(/home/{{ main_user }}/scripts/playlists_creation.sh) &"
-  when: airtime_install|changed
+  when: airtime_install is defined and airtime_install|changed
   tags: scripts
 
 #=====================================================================
@@ -178,6 +180,15 @@
         user="root"
         hour="4" minute="0"
         job="/home/{{ main_user }}/scripts/backup_airtime.sh"
+  tags: scripts
+
+#=====================================================================
+# Widget data export script
+- name: Cron for widget data export
+  cron: name="Widget data export"
+        user="{{ main_user }}"
+        hour="*" minute="*"
+        job="/home/{{ main_user }}/scripts/export_widget_data.sh"
   tags: scripts
 
 ######################################################################

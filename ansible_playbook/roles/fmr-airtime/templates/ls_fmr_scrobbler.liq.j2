@@ -45,16 +45,21 @@ def scrobble(m) =
     title      = url.encode(m["title"])
     commercial = url.encode(m["commercial"])
 
+    file_path = m["filename"]
+    # Duration in seconds: 192.83
+    duration = string_of(file.duration(file_path))
+
     url =(api_server ^
-        "?partnerId="    ^ partnerId ^
-        "&partnerKey="   ^ partnerKey ^
-        "&id="           ^ id ^
-        #"&station="      ^ station ^
-        #"&show="         ^ show ^
-        "&artist="       ^ artist ^
-        "&album="        ^ album ^
-        "&title="        ^ title ^
-        "&commercial="   ^ commercial
+        "?partnerId="   ^ partnerId ^
+        "&partnerKey="  ^ partnerKey ^
+        "&id="          ^ id ^
+        #"&station="     ^ station ^
+        #"&show="        ^ show ^
+        "&artist="      ^ artist ^
+        "&album="       ^ album ^
+        "&title="       ^ title ^
+        "&duration="    ^ duration ^
+        "&commercial="  ^ commercial
         )
 
     # Match these Values appearing at the console  with the tunein Air Api or

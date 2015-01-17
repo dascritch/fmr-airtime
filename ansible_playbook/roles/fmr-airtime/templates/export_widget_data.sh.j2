@@ -1,0 +1,73 @@
+#!/bin/bash
+# ATTENTION : fichier géré par Ansible ! Les modifications seront perdues.
+
+# FTP_HOST='PUBLIC_WEB_SERVER'
+# FTP_USER='PUT_USERNAME_HERE'
+# FTP_PASS='PUT_PASSWORD_HERE'
+
+API_SERVER="http://localhost/api"
+
+AT_LIVEINFO="/tmp/airtime-live-info"
+AT_WEEKINFO="/tmp/airtime-week-info"
+LS_NOWPLAYLING="/tmp/liquidsoap-now_playing.csv"
+
+######################################################################
+# Retrieve data
+######################################################################
+
+# Callback ***() will be added later, as it confuses jq
+#curl -s "${API_SERVER}/live-info/type/endofday?callback=***" > $AT_LIVEINFO
+curl -s "${API_SERVER}/live-info/type/endofday" > $AT_LIVEINFO
+curl -s "${API_SERVER}/week-info?callback=***" > $AT_WEEKINFO
+
+add_callback() {
+    ( echo -n "***(" ; cat $AT_LIVEINFO ; echo ")" ) > ${AT_LIVEINFO}.tmp
+    mv ${AT_LIVEINFO}.tmp $AT_LIVEINFO
+}
+
+# Quit now if we don't have Liquidsoap scrobbler data.
+if [ ! -s $LS_NOWPLAYLING ]; then
+    add_callback
+    exit
+fi
+
+# If JSON entry currentShow is empty, then it means that Airtime is Offline and
+# that we are using Liquidsoap "default" fallback playlist. We must get the now
+# playing song from Liquidsoap.
+if [ "$(cat $AT_LIVEINFO | jq '.currentShow')" == "[]" ]; then
+    START="$(tail -n1 $LS_NOWPLAYLING | cut -f1 | sed "s/'/\\'/g" | sed 's/"/\\"/g')"
+    ARTIST="$(tail -n1 $LS_NOWPLAYLING | cut -f2 | sed "s/'/\\'/g" | sed 's/"/\\"/g')"
+    TITLE="$(tail -n1 $LS_NOWPLAYLING | cut -f4 | sed "s/'/\\'/g" | sed 's/"/\\"/g')"
+    DURATION="$(tail -n1 $LS_NOWPLAYLING | cut -f5 | sed "s/'/\\'/g" | sed 's/"/\\"/g')"
+    # Bashful horror... 
+    END="$(date -d"@$(echo "$(date -d"$START" +%s) + $DURATION" | bc)" +"%Y-%m-%d %H:%M:%S")"
+    cat $AT_LIVEINFO \
+        | echo -n $(jq -c ". + {
+            currentShow: [{
+                name: \"$ARTIST - $TITLE\",
+                starts:\"$START\",
+                start_timestamp:\"$START\",
+                end_timestamp:\"$END\"
+                ends:\"$END\",
+                url:\"\",
+            }] }") \
+        > ${AT_LIVEINFO}.new
+    mv ${AT_LIVEINFO}.new $AT_LIVEINFO
+fi
+
+# Add the callback as required by widgets
+add_callback
+
+######################################################################
+# Upload data
+######################################################################
+
+# ftp -n -v $HOST << EOT
+# user $USER $PASSWD
+# ascii
+# prompt
+# put $AT_LIVEINFO
+# put $AT_WEEKINFO
+# bye
+# EOT
+

@@ -20,6 +20,7 @@ if($partnerId != "{{ scrobbler_partner_id }}"
 $artist     = htmlspecialchars($_REQUEST["artist"]);
 $album      = htmlspecialchars($_REQUEST["album"]);
 $title      = htmlspecialchars($_REQUEST["title"]);
+$duration   = htmlspecialchars($_REQUEST["duration"]);
 $commercial = htmlspecialchars($_REQUEST["commercial"]);
 
 # Output the information but not for Jingles, etc.
@@ -30,12 +31,13 @@ if ($commercial != true) {
     # Open the file to get existing content
     $cur = file_get_contents($file);
 
-    $csv = '"' . date("c") . '";'
-         #. '"' . $station . '";'
-         #. '"' . $show . '";'
-         . '"' . $artist . '";'
-         . '"' . $album . '";'
-         . '"' . $title . '";'
+    $csv = date("Y-m-d H:i:s") . "\t"
+         #. $station . "\t"
+         #. $show . "\t"
+         . $artist . "\t"
+         . $album . "\t"
+         . $title . "\t"
+         . $duration
          . "\n";
 
     # Append the New Information to the file
