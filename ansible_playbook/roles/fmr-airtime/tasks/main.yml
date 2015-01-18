@@ -20,7 +20,6 @@
     - cifs-utils
     - fapg
     - jq
-    - bc
   tags: packages
 
 ######################################################################
@@ -142,7 +141,6 @@
     - sync_nas.sh
     - playlists_creation.sh
     - backup_airtime.sh
-    - export_widget_data.sh
   tags: scripts
 
 #=====================================================================
@@ -180,15 +178,6 @@
         user="root"
         hour="4" minute="0"
         job="/home/{{ main_user }}/scripts/backup_airtime.sh"
-  tags: scripts
-
-#=====================================================================
-# Widget data export script
-- name: Cron for widget data export
-  cron: name="Widget data export"
-        user="{{ main_user }}"
-        hour="*" minute="*"
-        job="/home/{{ main_user }}/scripts/export_widget_data.sh"
   tags: scripts
 
 ######################################################################

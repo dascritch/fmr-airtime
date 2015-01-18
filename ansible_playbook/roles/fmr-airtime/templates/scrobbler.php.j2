@@ -2,9 +2,12 @@
 # ATTENTION : fichier géré par Ansible ! Les modifications seront perdues.
 # vim: ft=php
 
-$partnerId  = htmlspecialchars($_REQUEST["partnerId"]);
-$partnerKey = htmlspecialchars($_REQUEST["partnerKey"]);
-$id         = htmlspecialchars($_REQUEST["id"]);
+$f_live_info = '/tmp/airtime-live-info';
+$f_week_info = '/tmp/airtime-week-info';
+
+$partnerId  = htmlspecialchars($_POST["partnerId"]);
+$partnerKey = htmlspecialchars($_POST["partnerKey"]);
+$id         = htmlspecialchars($_POST["id"]);
 
 # Verify it's the client we expect
 if($partnerId != "{{ scrobbler_partner_id }}"
@@ -13,37 +16,49 @@ if($partnerId != "{{ scrobbler_partner_id }}"
 }
 
 # Retrieve info
-#$station    = htmlspecialchars($_REQUEST["station"]);
+#$station    = htmlspecialchars($_POST["station"]);
 # NOTE: "show" value is not empty between two shows, so the fallback "default"
 # playlist tracks appears to belong to previous show :-(
-#$show       = htmlspecialchars($_REQUEST["show"]);
-$artist     = htmlspecialchars($_REQUEST["artist"]);
-$album      = htmlspecialchars($_REQUEST["album"]);
-$title      = htmlspecialchars($_REQUEST["title"]);
-$duration   = htmlspecialchars($_REQUEST["duration"]);
-$commercial = htmlspecialchars($_REQUEST["commercial"]);
+#$show       = htmlspecialchars($_POST["show"]);
+$artist     = htmlspecialchars($_POST["artist"]);
+$album      = htmlspecialchars($_POST["album"]);
+$title      = htmlspecialchars($_POST["title"]);
+$duration   = htmlspecialchars($_POST["duration"]);
+# Commercials (jingles, etc.) are filtered out in "ls_fmr_scrobbler.liq".
+#$commercial = htmlspecialchars($_POST["commercial"]);
+$live_info  = $_POST["live_info"];
+$week_info  = $_POST["week_info"];
 
-# Output the information but not for Jingles, etc.
-if ($commercial != true) {
-    # State the file to open with existing content
-    $file = '/tmp/liquidsoap-now_playing.csv';
+$start = date("Y-m-d H:i:s");
+$end   = date("Y-m-d H:i:s", time() + $duration);
 
-    # Open the file to get existing content
-    $cur = file_get_contents($file);
+#=====================================================================
+# week-info is not modified
+#=====================================================================
+$week_info = "***($week_info)";
+file_put_contents($f_week_info, $week_info);
 
-    $csv = date("Y-m-d H:i:s") . "\t"
-         #. $station . "\t"
-         #. $show . "\t"
-         . $artist . "\t"
-         . $album . "\t"
-         . $title . "\t"
-         . $duration
-         . "\n";
+#=====================================================================
+# live-info
+#=====================================================================
+# We must add a "currentShow" entry if it was absent.
+$json_li = json_decode($live_info, true);
 
-    # Append the New Information to the file
-    $cur .= $csv;
-
-    # Write the contents back to the file
-    file_put_contents($file, $cur);
+if (count($json_li["currentShow"]) == 0) {
+    $currentShow = array(
+        "currentShow" => array(array(
+            "name"              => "$artist - $title",
+            "starts"            => "$start",
+            "start_timestamp"   => "$start",
+            "end_timestamp"     => "$end",
+            "ends"              => "$end",
+            "url"               => "",
+        ))
+    );
+    $live_info = json_encode(array_merge($json_li, $currentShow));
 }
+
+# Add the callback
+$live_info = "***($live_info)";
+file_put_contents($f_live_info, $live_info);
 
