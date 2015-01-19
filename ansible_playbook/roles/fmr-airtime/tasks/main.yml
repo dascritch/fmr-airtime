@@ -80,7 +80,6 @@
 - name: Create sounds library folder
   file: path="{{ library_path }}" state=directory
         mode=0775 owner="{{ main_user }}" group="{{ main_user }}"
-  when: disk_exist.stat.exists
   tags: filesystem
 
 # Copy the security sound file on the local FS
@@ -184,6 +183,8 @@
 # Soundcards settings
 ######################################################################
 
+# TODO: Is using "defaults.pcm.card 0" in /etc/asound.conf a better
+# alternative? It doesn't seems to requires a reboot.
 - name: Set soundcards order
   lineinfile: dest=/etc/modprobe.d/alsa-base.conf
               regexp="^options {{ item.driver }}"
@@ -192,11 +193,14 @@
   register: soundcards_order
   tags: sound
 
-# "alsa force-reload" seems to always return status code 1 :-(
+# "alsa force-reload" may return code 1 ("failed: modules still loaded: ...")
+# at the first run, but will work at the next. So let's loop a bit on it.
 - name: Reload ALSA configuration
   command: alsa force-reload
   register: alsa_reload
-  failed_when: "alsa_reload.rc != 1"
+  until: alsa_reload.rc == 0
+  retries: 5
+  delay: 2
   when: soundcards_order|changed
   notify: Restart airtime-liquidsoap
   tags: sound
@@ -221,6 +225,7 @@
     - icecast2
   tags: airtime
 
+# This step could fail if music_path has not yet been rsync'ed.
 - name: Add sounds folder to Airtime watched folders
   command: "airtime-import --watch-add '{{ music_path }}'"
   register: watch_add
@@ -300,14 +305,15 @@
   failed_when: false
   tags:
     - airtime
-    - airtime_fmr
+    - airtime_custom
 
+# We use DELETE;INSERT instead of UPDATE because the entry may not exists yet.
 - name: Set Airtime output to a device
   command: sudo -u postgres psql --quiet --no-align --tuples-only -c "DELETE FROM cc_stream_setting WHERE keyname = 'output_sound_device' ; INSERT INTO cc_stream_setting ("keyname", "value", "type") VALUES ('output_sound_device', 'true', 'boolean');" airtime
   when: "'true' not in psql_output_device.stdout"
   tags:
     - airtime
-    - airtime_fmr
+    - airtime_custom
 
 #---------------------------------------------------------------------
 # Set output to ALSA device
@@ -320,14 +326,14 @@
   failed_when: false
   tags:
     - airtime
-    - airtime_fmr
+    - airtime_custom
 
 - name: Set Airtime output to ALSA
   command: sudo -u postgres psql --quiet --no-align --tuples-only -c "DELETE FROM cc_stream_setting WHERE keyname = 'output_sound_device_type' ; INSERT INTO cc_stream_setting ("keyname", "value", "type") VALUES ('output_sound_device_type', 'ALSA', 'string');" airtime
   when: "'ALSA' not in psql_output_type.stdout"
   tags:
     - airtime
-    - airtime_fmr
+    - airtime_custom
 
 #---------------------------------------------------------------------
 # Disable Stream 1
@@ -340,14 +346,84 @@
   failed_when: false
   tags:
     - airtime
-    - airtime_fmr
+    - airtime_custom
 
 - name: Disable Airtime stream 1
   command: sudo -u postgres psql --quiet --no-align --tuples-only -c "DELETE FROM cc_stream_setting WHERE keyname = 's1_enable' ; INSERT INTO cc_stream_setting ("keyname", "value", "type") VALUES ('s1_enable', 'false', 'boolean');" airtime
   when: "'false' not in psql_stream_1.stdout"
   tags:
     - airtime
-    - airtime_fmr
+    - airtime_custom
+
+#---------------------------------------------------------------------
+# Allow Remote Websites To Access "Schedule" Info
+#---------------------------------------------------------------------
+# NOTE: Values of the table cc_pref are cached into APC, so we need to restart
+# or reload Apache after changing them.
+
+- name: Verify Airtime allow remote access to schedule info
+  command: sudo -u postgres psql --quiet --no-align --tuples-only -c "SELECT valstr FROM cc_pref WHERE keystr = 'third_party_api'" airtime
+  register: psql_allow_remote
+  changed_when: false
+  failed_when: false
+  tags:
+    - airtime
+    - airtime_custom
+
+- name: Set Airtime to allow remote access to schedule info
+  command: sudo -u postgres psql --quiet --no-align --tuples-only -c "DELETE FROM cc_pref WHERE keystr = 'third_party_api' ; INSERT INTO cc_pref ("keystr", "valstr") VALUES ('third_party_api', '1');" airtime
+  when: "psql_allow_remote.stdout != '1'"
+  notify: Reload apache2
+  tags:
+    - airtime
+    - airtime_custom
+
+#---------------------------------------------------------------------
+# Set Airtime radio name
+#---------------------------------------------------------------------
+
+- name: Verify Airtime has a radio name
+  command: sudo -u postgres psql --quiet --no-align --tuples-only -c "SELECT valstr FROM cc_pref WHERE keystr = 'station_name'" airtime
+  register: psql_radio_name
+  changed_when: false
+  failed_when: false
+  tags:
+    - airtime
+    - airtime_custom
+
+- name: Set Airtime radio name
+  command: sudo -u postgres psql --quiet --no-align --tuples-only -c "DELETE FROM cc_pref WHERE keystr = 'station_name' ; INSERT INTO cc_pref ("keystr", "valstr") VALUES ('station_name', '{{ program_name }}');" airtime
+  when: "psql_radio_name.stdout == ''"
+  notify: Reload apache2
+  tags:
+    - airtime
+    - airtime_custom
+
+#---------------------------------------------------------------------
+# Set Airtime first day of week to Monday
+#---------------------------------------------------------------------
+
+- name: Verify Airtime first day of week is Monday
+  command: sudo -u postgres psql --quiet --no-align --tuples-only -c "SELECT valstr FROM cc_pref WHERE keystr = 'week_start_day'" airtime
+  register: psql_week_first_day
+  changed_when: false
+  failed_when: false
+  tags:
+    - airtime
+    - airtime_custom
+
+- name: Set Airtime first day of week to Monday
+  command: sudo -u postgres psql --quiet --no-align --tuples-only -c "DELETE FROM cc_pref WHERE keystr = 'week_start_day' ; INSERT INTO cc_pref ("keystr", "valstr") VALUES ('week_start_day', '1');" airtime
+  when: "psql_week_first_day.stdout == ''"
+  notify: Reload apache2
+  tags:
+    - airtime
+    - airtime_custom
+
+#---------------------------------------------------------------------
+# TODO
+# Set Airtime Email settings (SMTP server, and from address)
+#---------------------------------------------------------------------
 
 #=====================================================================
 # Liquidsoap customisations
@@ -406,22 +482,7 @@
 #---------------------------------------------------------------------
 # Liquidsoap: Setup the scrobbler
 #---------------------------------------------------------------------
-
-- name: Create Scrobbler API destination folder
-  file: path="/usr/share/airtime/public/{{ scrobbler_path }}"
-        state=directory
-        mode=0775 owner="www-data" group="www-data"
-  tags:
-    - airtime
-    - scrobbler
-
-- name: Deploy scrobbler PHP file
-  template: src="scrobbler.php.j2"
-            dest="/usr/share/airtime/public/{{ scrobbler_path }}/{{ scrobbler_file }}"
-            mode=0664 owner="www-data" group="www-data"
-  tags:
-    - airtime
-    - scrobbler
+# Only if scrobbler_server is defined
 
 - name: Include our scrobbler script into Airtime
   lineinfile: dest=/usr/lib/airtime/pypo/bin/liquidsoap_scripts/ls_script.liq
@@ -432,6 +493,7 @@
     - '%include "/home/{{ main_user }}/liquidsoap_scripts/ls_{{ program_code }}_scrobbler.liq"'
     #- 's = on_track(scrobble, s)'
     - 's = on_metadata(scrobble, s)'
+  when: scrobbler_server is defined
   notify: Restart airtime-liquidsoap
   tags:
     - airtime
@@ -447,6 +509,7 @@
   with_items:
     - { r: '^(default = rewrite_metadata.*)title(.*)',
         l: '\1comment\2' }
+  when: scrobbler_server is defined
   notify: Restart airtime-liquidsoap
   tags:
     - airtime

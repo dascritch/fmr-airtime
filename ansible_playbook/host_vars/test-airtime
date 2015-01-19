@@ -1,5 +1,5 @@
 ---
-storage_disk: "/dev/sdb"
+storage_disk: ""
 storage_mount: "/mnt/localdisk"
 airtime_path: "{{ storage_mount }}/airtime"
 
@@ -32,13 +32,8 @@ nas_share: "Telechargements/discotheque"
 # Use "amixer" to know what volume identifiers to use.
 soundcards:
   - index: 0
-    driver: "snd-ice1712"     # M2496 [M Audio Audiophile 24/96]
-    volume:
-      - { i: "DAC,0", v: "75%" }
-      - { i: "DAC,1", v: "75%" }
-  - index: 1
     driver: "snd-hda-intel"   # MID [HDA Intel MID]
     volume:
-      - { i: "Master,0", v: "75%" }
+      - { i: "Master,0", v: "50%" }
 
 # vim: ft=ansible

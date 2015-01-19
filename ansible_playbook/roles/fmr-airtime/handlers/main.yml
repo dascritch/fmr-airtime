@@ -9,3 +9,12 @@
 - name: Restart airtime-media-monitor
   service: name=airtime-media-monitor state=restarted
 
+# To clear the same cache as the one served by Apache, the apc_clear_cache()
+# method must also be called from an HTTP context. So it's easier to reload
+# Apache2 to clear APC's cache...
+# - name: Clear APC cache
+#   command: php -r "apc_clear_cache();"
+- name: Reload apache2
+  service: name=apache2 state=reloaded
+
+

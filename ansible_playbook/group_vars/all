@@ -1,0 +1,9 @@
+admin_email: "mathieu+fmr@ghack.net"
+
+locale:
+  - en_US.UTF-8
+  - fr_FR.UTF-8
+
+timezone: "Europe/Paris"
+
+# vim: ft=ansible

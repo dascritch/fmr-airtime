@@ -1,0 +1,11 @@
+---
+# Playbook to setup the scrobbler server
+
+- hosts: Scrobbler
+  sudo: yes
+
+  roles:
+    - common
+    #- apache2
+    - fmr-airtime-scrobbler
+

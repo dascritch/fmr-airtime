@@ -1,4 +1,8 @@
 ---
+# Playbook to setup Airtime servers, and their dependencies
+
+######################################################################
+# Setup Airtime servers
 - hosts: Airtime
   # FIXME: Temporary fix for https://github.com/ansible/ansible/issues/9986
   sudo: yes
@@ -22,5 +26,9 @@
     # Finally, restart the system ONLY if we just installed Airtime!
     - name: Restart system on first install
       command: reboot
-      when: airtime_install|changed
+      when: airtime_install is defined and airtime_install|changed
+
+######################################################################
+# Setup Scrobbler server
+- include: airtime-scrobbler.yml
 

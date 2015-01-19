@@ -1,0 +1,14 @@
+---
+# defaults file for fmr-airtime-scrobbler
+
+www_root_path: "/var/www/html"
+www_user: "www-data"
+www_group: "www-data"
+
+scrobbler_dir: "scrobbler-api"
+scrobbler_file: "scrobbler.php"
+# NOTE: If overrided, it should be done in "{group,host}_vars" folder
+scrobbler_partner_id: "Override_Me"
+scrobbler_partner_key: "Override_Me"
+scrobbler_id: ""
+

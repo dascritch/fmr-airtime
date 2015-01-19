@@ -1,0 +1,69 @@
+VAGRANTFILE_API_VERSION = "2"
+Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
+  config.vm.box = "ubuntu/trusty64"
+
+  # Airtime server
+  config.vm.define "test-airtime" do |node|
+    node.vm.hostname = "test-airtime.example.test"
+    node.vm.network "public_network", bridge: "eth0"
+    # enable audio drivers on VM settings
+    node.vm.provider :virtualbox do |vb|
+      vb.customize ["modifyvm", :id,
+                    '--audio', 'pulse',
+                    '--audiocontroller', 'hda']
+    end
+    # Must first install a full kernel to get sound drivers (snd-hda-intel).
+    # FIXME: Until I can get the sound to work with VirtualBox VMs, this is not
+    # needed at all!
+    #node.vm.provision "shell", run: "once", inline: $BOOTSTRAP_AIRTIME
+  end
+
+  # Scrobbler server where Airtime will send Now Playing requests
+  config.vm.define "test-scrobbler" do |node|
+    node.vm.hostname = "test-scrobbler.example.test"
+    node.vm.network "public_network", bridge: "eth0"
+
+    # Install Apache2 + PHP5 to quickly test the Scrobbler API (Of course it
+    # should be an Ansible task...)
+    node.vm.provision "shell", run: "once", inline: $BOOTSTRAP_SCROBBLER
+
+    # Must include the provision bloc into the last VM so Ansible could
+    # provision all VMs at the same time.
+    node.vm.provision :ansible do |ansible|
+      ansible.groups = {
+        "Airtime"   => ["test-airtime"],
+        "Scrobbler" => ["test-scrobbler"],
+      }
+
+      ansible.playbook = "../all.yml"
+      ansible.sudo = true
+
+      # Disable default limit (required with Vagrant 1.5+)
+      ansible.limit = 'all'
+    end
+  end
+end
+
+# In order to get ALSA sound drivers, need to upgrade the kernel:
+$BOOTSTRAP_AIRTIME = <<EOF
+sudo usermod -a -G audio vagrant
+if [ ! -e /var/tmp/provisioning_done ]; then
+  export DEBIAN_FRONTEND=noninteractive
+  sudo apt-get update
+  sudo apt-get install -y linux-image-generic linux-headers-generic
+  touch /var/tmp/provisioning_done
+  sudo reboot
+fi
+EOF
+
+$BOOTSTRAP_SCROBBLER = <<EOF
+if [ ! -e /var/tmp/provisioning_done ]; then
+  export DEBIAN_FRONTEND=noninteractive
+  sudo apt-get update
+  sudo apt-get install -y libapache2-mod-php5
+  touch /var/tmp/provisioning_done
+  sudo reboot
+fi
+EOF
+
+# vim: ft=ruby

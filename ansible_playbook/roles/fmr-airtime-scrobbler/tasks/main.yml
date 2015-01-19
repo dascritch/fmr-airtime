@@ -1,0 +1,25 @@
+---
+# tasks file for fmr-airtime-scrobbler
+
+- name: Create web folders
+  file: path="{{ www_root_path }}/{{ item }}"
+        state=directory
+        mode=0775 owner="{{ www_user }}" group="{{ www_group }}"
+  with_items:
+    - "{{ scrobbler_dir }}"
+    - "api/live-info"
+    - "api/week-info"
+
+- name: Deploy scrobbler PHP file
+  template: src="{{ scrobbler_file }}.j2"
+            dest="{{ www_root_path }}/{{ scrobbler_dir }}/{{ scrobbler_file }}"
+            mode=0664 owner="{{ www_user }}" group="{{ www_group }}"
+
+- name: Deploy api/{live,week}-info/index.php
+  template: src="api-live_week-info.php.j2"
+            dest="{{ www_root_path }}/api/{{ item }}-info/index.php"
+            mode=0664 owner="{{ www_user }}" group="{{ www_group }}"
+  with_items:
+    - live
+    - week
+

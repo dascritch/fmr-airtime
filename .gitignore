@@ -7,3 +7,4 @@ adhoc/[Ss]cripts
 adhoc/[Ll]ocal
 pyvenv.cfg
 ansible_playbook/host_vars/airtime
+.vagrant

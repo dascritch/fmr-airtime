@@ -1,20 +1,33 @@
-# Tous les serveurs de FMR
-[Servers]
-airtime
-fmr-airtime
-booster-airtime
-londemiroir-airtime
+######################################################################
+# Tous les serveurs du parc
+######################################################################
+# FIXME: Requires to add "sudo: yes" into playbooks as well, as a temporary fix
+# for https://github.com/ansible/ansible/issues/9986
+[all]
+fmr-airtime             ansible_ssh_user=deploy ansible_sudo=yes
+booster-airtime         ansible_ssh_user=deploy ansible_sudo=yes
+londemiroir-airtime     ansible_ssh_user=deploy ansible_sudo=yes
+#radio-fmr.net           ansible_ssh_user=root
 
-[Servers:vars]
-ansible_ssh_user=deploy
-# FIXME: Temporary fix for https://github.com/ansible/ansible/issues/9986
-# requires to add "sudo: yes" into playbooks as well.
-ansible_sudo=yes
-
-# Les serveurs de diffusion Airtime/Liquidsoap
+######################################################################
+# Serveurs Airtime/Liquidsoap
+######################################################################
 [Airtime]
-airtime
 fmr-airtime
 booster-airtime
 londemiroir-airtime
+
+######################################################################
+# Serveur web publics recevant les scrobbles de Airtime
+######################################################################
+# NOTE : Airtime sera configuré pour scrobbler uniquement sur la première
+# machine.
+[Scrobbler]
+#radio-fmr.net
+
+######################################################################
+# Serveurs web
+######################################################################
+[Web]
+#radio-fmr.net
 
