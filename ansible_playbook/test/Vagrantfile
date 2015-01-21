@@ -14,8 +14,8 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     end
     # Must first install a full kernel to get sound drivers (snd-hda-intel).
     # FIXME: Until I can get the sound to work with VirtualBox VMs, this is not
-    # needed at all!
-    #node.vm.provision "shell", run: "once", inline: $BOOTSTRAP_AIRTIME
+    # needed... except that we need it to "simulate" Ansible "sound" tasks.
+    node.vm.provision "shell", run: "once", inline: $BOOTSTRAP_AIRTIME
   end
 
   # Scrobbler server where Airtime will send Now Playing requests

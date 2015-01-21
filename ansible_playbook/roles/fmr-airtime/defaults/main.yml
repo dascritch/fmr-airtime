@@ -75,7 +75,7 @@ nas_backup_share: ""
 
 # NOTE: These variables should be into a host_vars/ file, because they are used
 # in both roles "fmr-airtime" and "fmr-airtime-scrobbler".
-scrobbler_server: "{{ Scrobbler[0] }}"
+scrobbler_server: "{{ groups['Scrobbler'][0] }}"
 scrobbler_url: "http://{{ scrobbler_server }}/scrobbler-api/scrobbler.php"
 scrobbler_partner_id: "Override_Me"
 scrobbler_partner_key: "Override_Me"
@@ -87,6 +87,7 @@ interrupt_stream_ok: true
 
 # If you want a sound file to stream when nothing else is available. It must be
 # available under "files/".
+security_file: ""
 #security_file: "securite_{{ program_code }}.ogg"
 
 ######################################################################
