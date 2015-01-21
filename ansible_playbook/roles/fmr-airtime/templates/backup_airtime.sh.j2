@@ -1,80 +1,186 @@
 #!/bin/bash
 # ATTENTION : fichier géré par Ansible ! Les modifications seront perdues.
 
-# How many backup files shall we keep?
-NB_KEEP=14
+DEST="{{ nas_backup_mount }}"
 
-# List of dir to backup, one per line.
-# FIXME: Must not contain any space!
-BACKUP_DIRS="
-/etc/airtime
-"
+# Basename of the backup files
+BASE_NAME="backup_airtime-{{ program_code }}-"
 
 OWNER="{{ main_user }}"
 GROUP="{{ main_user }}"
 
-DEST_DIR="{{ storage_mount }}"
+# List of paths to backup, one per line.
+# FIXME: Paths must not contain any space!
+BACKUP_DIRS="
+/etc/airtime
+"
 
-# Basename of the backup files
-BASE_NAME="backup_airtime-"
-# Extension (see also the "tar" command below)
-BASE_EXT=".tar.bz2"
+# How many backup files shall we keep? (It depends on the Cron frequency)
+NB_KEEP=14
 
-DEST_NAME="${BASE_NAME}$(date +%F_%H-%M-%S)"
-DEST_FILE="${DEST_NAME}${BASE_EXT}"
+NAME="${BASE_NAME}$(date +%F_%H-%M-%S)"
+# File extension should be adapted to the "tar" command below.
+FILE="${NAME}.tar.xz"
 
+TMP_DEST="/var/backups"
+
+######################################################################
+# Functions
+######################################################################
+
+clean_exit() {
+    cd /tmp
+    if [ "x$MOUNT_DONE" == "x1" ]; then
+        umount "$DEST"
+    fi
+    exit $1
+}
+
+log_err() {
+    # Error log should go to stderr, not stdout
+    echo "ERROR: $*" >/dev/stderr
+}
+
+mount_dest() {
+    # Is the destination not mounted yet?
+    if ! grep -q "$DEST" /proc/mounts; then
+        # No. Shall we first create the mount point?
+        if [ ! -d "$DEST" ]; then
+            mkdir "$DEST"
+        fi
+        # Can we mount it now?
+        if ! mount "$DEST" &>/dev/null; then
+            log_err "'$DEST' is not mounted, and I couldn't mount it."
+            log_err "Is it enabled in /etc/fstab?"
+            exit 1
+        fi
+        MOUNT_DONE=1
+    fi
+}
+
+######################################################################
+# Pre-fly checks
 ######################################################################
 
 if [ $(whoami) != 'root' ]; then
-    echo "ERROR: Must be executed by root."
+    log_err "Must be runned by root."
     exit 1
 fi
 
-cd /tmp
-mkdir "$DEST_NAME"
-cd "$DEST_NAME"
+######################################################################
+# Preparation
+######################################################################
+
+# Can we go into the temp folder?
+if ! cd "$TMP_DEST"; then
+    log_err "Unable to cd into '$TMP_DEST'."
+    clean_exit 1
+fi
+
+# Create a sub-folder which will be tar'ed at the end.
+if ! mkdir "$NAME"; then
+    log_err "Cannot write to '$(pwd)'."
+    clean_exit 1
+fi
+
+cd "$NAME"
 
 ######################################################################
 # Database
+######################################################################
 
-sudo -u postgres pg_dumpall | gzip -c > db.dump.gz
-
-# Restore helper
-cat <<"EOF" > db.restore.sh
-#!/bin/bash
-echo ''
-echo "ARE YOU SURE? You are going to drop your Airtime DB!"
-echo "Press Ctrl-C if you want to quit, or Enter to continue."
-read
-dump="$(cd $(dirname $0); pwd)/db.dump.gz"
-if [ -s "$dump" ]; then
-    sudo -u postgres dropdb airtime
-    gunzip -c "$dump" | sudo -u postgres psql -f -
-fi
-EOF
-chmod +x db.restore.sh
+sudo -u postgres pg_dumpall | xz -c > db.dump.xz
 
 ######################################################################
 # Folders
+######################################################################
 
-touch "PLEASE_UNTAR_AS_ROOT_TO_PRESERVE_PERMISSIONS"
+touch "PLEASE_untar_as_root_to_preserve_permissions"
+
+mkdir files
 
 for dir in $BACKUP_DIRS; do
-    rsync -qaR $dir .
+    tar -cJf files/${dir//"/"/"_"}.tar.xz $dir &>/dev/null
 done
 
 ######################################################################
-# Compress and move the final file
+# Include a restore helper script
+######################################################################
 
-cd ..
-tar -cjf "${DEST_FILE}" "$DEST_NAME"
-rm -rf "$DEST_NAME"
+cat <<"EOF" > restore.sh
+#!/bin/bash
+if [ $(whoami) != 'root' ]; then
+    echo "ERROR: You must be root to preserve file permissions."
+    exit 1
+fi
+if [ "x$1" != "x--i-am-sure" ]; then
+    echo "ARE YOU SURE? You are going to overwrite backuped folders and databases!"
+    echo "If you are sure, launch me with the '--i-am-sure' parameter."
+    exit
+fi
 
-chown $OWNER:$GROUP ${DEST_FILE}
-
-# Remove oldest file(s)
-while [ $(find "$DEST_DIR" -name "${BASE_NAME}*${BASE_EXT}" | wc -l) -gt 14 ]; do
-    rm "$(find "$DEST_DIR" -name "${BASE_NAME}*${BASE_EXT}" | sort -r | tail -1)"
+# Files
+files="$(cd $(dirname $0); pwd)/files"
+# Files are restored relative to "/"
+cd /
+for f in $files/*; do
+    tar -xvJf $f
 done
 
-mv "${DEST_FILE}" "$DEST_DIR"
+# Database
+# First, go back to previous path
+cd -
+dump="$(cd $(dirname $0); pwd)/db.dump.xz"
+if [ -s "$dump" ]; then
+    sudo -u postgres dropdb airtime
+    xz -dc "$dump" | sudo -u postgres psql -f -
+fi
+
+# Reload Apache to refresh APC cache
+/etc/init.d/apache2 reload
+EOF
+chmod +x restore.sh
+
+######################################################################
+# Compress the backup
+######################################################################
+
+# Go back to parent folder
+cd "$TMP_DEST"
+
+if tar -cJf "$FILE" "$NAME"; then
+    rm -rf "$NAME"
+else
+    log_err "Failed to tar '$NAME' into '$(pwd)'."
+    clean_exit 1
+fi
+
+chown $OWNER:$GROUP ${FILE}
+
+######################################################################
+# Move the file to its destination
+######################################################################
+
+mount_dest
+
+cd "$TMP_DEST"
+
+if cp "${FILE}" "$DEST"; then
+    rm "${FILE}"
+else
+    log_err "Could not copy '$FILE' from '$(pwd)' to '$DEST'!"
+    clean_exit 1
+fi
+
+cd "$DEST"
+
+######################################################################
+# Keep only $NB_KEEP more recent files.
+######################################################################
+
+while [ $(find . -name "${BASE_NAME}*" | wc -l) -gt $NB_KEEP ]; do
+    rm "$(find . -name "${BASE_NAME}*" | sort -r | tail -1)"
+done
+
+clean_exit
+

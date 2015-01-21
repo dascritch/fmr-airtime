@@ -1,6 +1,4 @@
 ---
-# tasks file for fmr-airtime
-
 ######################################################################
 # Packages
 ######################################################################
@@ -82,19 +80,25 @@
         mode=0775 owner="{{ main_user }}" group="{{ main_user }}"
   tags: filesystem
 
-# Copy the security sound file on the local FS
-- name: Upload security sound file
+# Copy the security music file on the local FS
+- name: Upload security music file
   copy: src="{{ security_file }}"
         dest="/home/{{ main_user }}/{{ security_file }}"
         mode=0664 owner="{{ main_user }}" group="{{ main_user }}"
   when: security_file is defined and security_file != ""
   tags:
     - filesystem
-    - sound
+    - music
 
 ######################################################################
-# Sound files synchronisation from remote NAS
+# Remote NAS mounts setup
 ######################################################################
+# Basicaly, mounts are only mounted and unmounted when necessary.
+# To create their mount points could be tricky, because when they are mounted they
+# are owned by the user, but by root when unmounted. To workaround this, leave
+# Ansible action "mount: state=mounted" take care of it. And because the
+# "unmounted" action could fail if the mount point were currently used, set it
+# as never failing.
 
 - name: Install Samba packages
   apt: name={{ item }} state=latest
@@ -104,24 +108,54 @@
     - packages
     - mounts
 
-# - name: Remote NAS mount point directory creation
-#   file: path="{{ nas_mount }}" state=directory
-#         mode=0775 owner="{{ main_user }}" group="{{ main_user }}"
-#   tags: mounts
+#=====================================================================
+# Music NAS
+#=====================================================================
+# Must be mountable and writable by main_user
 
-- name: Setup the mount point of remote NAS
-  mount: name="{{ nas_mount }}" src="//{{ nas_hostname }}/{{ nas_share}}" fstype=cifs
-         state=mounted opts=ro,noauto,user,guest
-  register: nas_mounted
+# TODO: Replace guest auth by a login configured on the NAS.
+- name: Setup the music NAS mount point
+  mount: name="{{ nas_music_mount }}" src="//{{ nas_music_hostname }}/{{ nas_music_share}}"
+         fstype=cifs opts=rw,noauto,user,guest
+         state=mounted
   changed_when: false
-  tags: mounts
+  tags:
+    - mounts
+    - music
 
-- name: Unmount remote NAS now that it has been configured
-  mount: name="{{ nas_mount }}" src="//{{ nas_hostname }}/{{ nas_share}}" fstype=cifs
+- name: Unmount music NAS, now that it has been configured
+  mount: name="{{ nas_music_mount }}" src="//{{ nas_music_hostname }}/{{ nas_music_share}}"
+         fstype=cifs opts=ro,noauto,user,guest
          state=unmounted
-  when: nas_mounted|changed
   changed_when: false
-  tags: mounts
+  failed_when: false
+  tags:
+    - mounts
+    - music
+
+#=====================================================================
+# Backup NAS
+#=====================================================================
+
+# TODO: Replace guest auth by a login configured on the NAS.
+- name: Mount the backup NAS
+  mount: name="{{ nas_backup_mount }}" src="//{{ nas_backup_hostname }}/{{ nas_backup_share}}"
+         fstype=cifs opts=rw,noauto,guest
+         state=mounted
+  changed_when: false
+  tags:
+    - mounts
+    - backup
+
+- name: Unmount backup NAS, now that it has been configured
+  mount: name="{{ nas_backup_mount }}" src="//{{ nas_backup_hostname }}/{{ nas_backup_share}}"
+         fstype=cifs opts=rw,noauto,guest
+         state=unmounted
+  changed_when: false
+  failed_when: false
+  tags:
+    - mounts
+    - backup
 
 ######################################################################
 # Scripts deployment
@@ -140,79 +174,65 @@
     - sync_nas.sh
     - playlists_creation.sh
     - backup_airtime.sh
-  tags: scripts
+  tags:
+    - scripts
+    - music
+    - backup
 
-#=====================================================================
-# Sound Files Sync Script
+######################################################################
+# Crontabs
+######################################################################
+
+# Music files sync script
 - name: Cron for sounds synchronisation script
   cron: name="Synchronisation of remote NAS"
         user="{{ main_user }}"
         hour="*" minute="55"
         job="/home/{{ main_user }}/scripts/sync_nas.sh"
-  tags: scripts
+  tags:
+    - crontab
+    - scripts
+    - music
 
-- name: Run synchronisation right now, in background (but wait 5s to at least retrieve some files!)
-  shell: sudo -u "{{ main_user }}" bash -c "(/home/{{ main_user }}/scripts/sync_nas.sh) & sleep 5"
-  when: airtime_install is defined and airtime_install|changed
-  tags: scripts
-
-#=====================================================================
-# Playlists Creation Script
+# Playlists creation script
 - name: Cron for M3U playlists creation script
   cron: name="Creation of playlists"
         user="{{ main_user }}"
         hour="3" minute="0"
         job="/home/{{ main_user }}/scripts/playlists_creation.sh"
-  tags: scripts
+  tags:
+    - crontab
+    - scripts
+    - music
 
-- name: Run playlists creation right now, in background
-  shell: sudo -u "{{ main_user }}" bash -c "(/home/{{ main_user }}/scripts/playlists_creation.sh) &"
-  when: airtime_install is defined and airtime_install|changed
-  tags: scripts
-
-#=====================================================================
 # Backup script
 - name: Cron for Airtime Backup script
   cron: name="Airtime backup"
         user="root"
         hour="4" minute="0"
         job="/home/{{ main_user }}/scripts/backup_airtime.sh"
-  tags: scripts
+  tags:
+    - crontab
+    - scripts
+    - backup
 
 ######################################################################
-# Soundcards settings
+# Pre-run scripts
 ######################################################################
 
-# TODO: Is using "defaults.pcm.card 0" in /etc/asound.conf a better
-# alternative? It doesn't seems to requires a reboot.
-- name: Set soundcards order
-  lineinfile: dest=/etc/modprobe.d/alsa-base.conf
-              regexp="^options {{ item.driver }}"
-              line="options {{ item.driver }} index={{ item.index }}"
-  with_items: soundcards
-  register: soundcards_order
-  tags: sound
+- name: Run synchronisation right now, in background (but wait 5s to at least retrieve some files!)
+  shell: sudo -u "{{ main_user }}" bash -c "(/home/{{ main_user }}/scripts/sync_nas.sh) & sleep 5"
+  when: airtime_install is defined and airtime_install|changed
+  tags:
+    - scripts
+    - music
 
-# "alsa force-reload" may return code 1 ("failed: modules still loaded: ...")
-# at the first run, but will work at the next. So let's loop a bit on it.
-- name: Reload ALSA configuration
-  command: alsa force-reload
-  register: alsa_reload
-  until: alsa_reload.rc == 0
-  retries: 5
-  delay: 2
-  when: soundcards_order|changed
-  notify: Restart airtime-liquidsoap
-  tags: sound
-
-# Set sound volume
-- name: Set ALSA volumes
-  command: amixer -c"{{ item.0.index }}" set "{{ item.1.i }}" "{{ item.1.v }}" unmute
-  with_subelements:
-    - soundcards
-    - volume
-  changed_when: false
-  tags: sound
+- name: Run playlists creation right now, in background
+  shell: sudo -u "{{ main_user }}" bash -c "(/home/{{ main_user }}/scripts/playlists_creation.sh) &"
+  when: airtime_install is defined and airtime_install|changed
+  tags:
+    - scripts
+    - music
 
 ######################################################################
 # Airtime specifics
@@ -225,293 +245,9 @@
     - icecast2
   tags: airtime
 
-# This step could fail if music_path has not yet been rsync'ed.
-- name: Add sounds folder to Airtime watched folders
-  command: "airtime-import --watch-add '{{ music_path }}'"
-  register: watch_add
-  changed_when: "'successfully' in watch_add.stdout"
-  failed_when: "'not a directory' in watch_add.stdout or 'Error' in watch_add.stdout"
-  tags: airtime
-
-######################################################################
-# Airtime configuration
 ######################################################################
 
-#=====================================================================
-# Airtime Post-install settings
-#=====================================================================
-
-# FIXME OPUS plugin seems to prevent OGG files from being played :-(
-- name: AWFULHACK Retrieve path to OPUS Liquidsoap plugin
-  shell: dpkg -L liquidsoap-plugin-opus |grep opus.cmxs
-  register: opus_file
-  changed_when: false
-  tags:
-    - airtime
-    - airtime_postinstall
-
-- name: AWFULHACK Verify if OPUS Liquidsoap plugin exists
-  stat: path="{{ opus_file.stdout }}" get_md5=no get_checksum=no
-  register: opus
-  tags:
-    - airtime
-    - airtime_postinstall
-
-- name: AWFULHACK Remove OPUS Liquidsoap plugin which prevents playing OGG
-  command: mv "{{ opus_file.stdout }}" "{{ opus_file.stdout }}_BAK"
-  when: opus.stat.exists
-  tags:
-    - airtime
-    - airtime_postinstall
-
-# FIXME Temporary fix for https://github.com/sourcefabric/Airtime/pull/82
-- name: Verify if airtime-liquidsoap starts too early regarding Apache (S91)
-  stat: path="/etc/rc2.d/S20airtime-liquidsoap" get_md5=no get_checksum=no
-  register: starts_too_early
-  tags:
-    - airtime
-    - airtime_postinstall
-
-- name: Set airtime-liquidsoap to start before Apache
-  command: mv "/etc/rc{{ item.rc }}.d/{{ item.old }}airtime-liquidsoap" "/etc/rc{{ item.rc }}.d/{{ item.new }}airtime-liquidsoap"
-  with_items:
-    - { rc: "0", old: "K20", new: "K08" }
-    - { rc: "1", old: "K20", new: "K08" }
-    - { rc: "2", old: "S20", new: "S92" }
-    - { rc: "3", old: "S20", new: "S92" }
-    - { rc: "4", old: "S20", new: "S92" }
-    - { rc: "5", old: "S20", new: "S92" }
-    - { rc: "6", old: "K20", new: "K08" }
-  when: starts_too_early.stat.exists
-  tags:
-    - airtime
-    - airtime_postinstall
-
-#=====================================================================
-# Set Airtime configuration
-#=====================================================================
-# SQL queries are viewable in the source code of Airtime:
-# https://github.com/sourcefabric/Airtime/blob/master/airtime_mvc/build/sql/defaultdata.sql#L20
-#=====================================================================
-
-#---------------------------------------------------------------------
-# Set output to Hardware device
-#---------------------------------------------------------------------
-
-- name: Verify Airtime output is set to a device
-  command: sudo -u postgres psql --quiet --no-align --tuples-only -c "SELECT value FROM cc_stream_setting WHERE keyname = 'output_sound_device'" airtime
-  register: psql_output_device
-  changed_when: false
-  failed_when: false
-  tags:
-    - airtime
-    - airtime_custom
-
-# We use DELETE;INSERT instead of UPDATE because the entry may not exists yet.
-- name: Set Airtime output to a device
-  command: sudo -u postgres psql --quiet --no-align --tuples-only -c "DELETE FROM cc_stream_setting WHERE keyname = 'output_sound_device' ; INSERT INTO cc_stream_setting ("keyname", "value", "type") VALUES ('output_sound_device', 'true', 'boolean');" airtime
-  when: "'true' not in psql_output_device.stdout"
-  tags:
-    - airtime
-    - airtime_custom
-
-#---------------------------------------------------------------------
-# Set output to ALSA device
-#---------------------------------------------------------------------
-
-- name: Verify Airtime output is set to ALSA
-  command: sudo -u postgres psql --quiet --no-align --tuples-only -c "SELECT value FROM cc_stream_setting WHERE keyname = 'output_sound_device_type'" airtime
-  register: psql_output_type
-  changed_when: false
-  failed_when: false
-  tags:
-    - airtime
-    - airtime_custom
-
-- name: Set Airtime output to ALSA
-  command: sudo -u postgres psql --quiet --no-align --tuples-only -c "DELETE FROM cc_stream_setting WHERE keyname = 'output_sound_device_type' ; INSERT INTO cc_stream_setting ("keyname", "value", "type") VALUES ('output_sound_device_type', 'ALSA', 'string');" airtime
-  when: "'ALSA' not in psql_output_type.stdout"
-  tags:
-    - airtime
-    - airtime_custom
-
-#---------------------------------------------------------------------
-# Disable Stream 1
-#---------------------------------------------------------------------
-
-- name: Verify that Airtime stream 1 is disabled
-  command: sudo -u postgres psql --quiet --no-align --tuples-only -c "SELECT value FROM cc_stream_setting WHERE keyname = 's1_enable'" airtime
-  register: psql_stream_1
-  changed_when: false
-  failed_when: false
-  tags:
-    - airtime
-    - airtime_custom
-
-- name: Disable Airtime stream 1
-  command: sudo -u postgres psql --quiet --no-align --tuples-only -c "DELETE FROM cc_stream_setting WHERE keyname = 's1_enable' ; INSERT INTO cc_stream_setting ("keyname", "value", "type") VALUES ('s1_enable', 'false', 'boolean');" airtime
-  when: "'false' not in psql_stream_1.stdout"
-  tags:
-    - airtime
-    - airtime_custom
-
-#---------------------------------------------------------------------
-# Allow Remote Websites To Access "Schedule" Info
-#---------------------------------------------------------------------
-# NOTE: Values of the table cc_pref are cached into APC, so we need to restart
-# or reload Apache after changing them.
-
-- name: Verify Airtime allow remote access to schedule info
-  command: sudo -u postgres psql --quiet --no-align --tuples-only -c "SELECT valstr FROM cc_pref WHERE keystr = 'third_party_api'" airtime
-  register: psql_allow_remote
-  changed_when: false
-  failed_when: false
-  tags:
-    - airtime
-    - airtime_custom
-
-- name: Set Airtime to allow remote access to schedule info
-  command: sudo -u postgres psql --quiet --no-align --tuples-only -c "DELETE FROM cc_pref WHERE keystr = 'third_party_api' ; INSERT INTO cc_pref ("keystr", "valstr") VALUES ('third_party_api', '1');" airtime
-  when: "psql_allow_remote.stdout != '1'"
-  notify: Reload apache2
-  tags:
-    - airtime
-    - airtime_custom
-
-#---------------------------------------------------------------------
-# Set Airtime radio name
-#---------------------------------------------------------------------
-
-- name: Verify Airtime has a radio name
-  command: sudo -u postgres psql --quiet --no-align --tuples-only -c "SELECT valstr FROM cc_pref WHERE keystr = 'station_name'" airtime
-  register: psql_radio_name
-  changed_when: false
-  failed_when: false
-  tags:
-    - airtime
-    - airtime_custom
-
-- name: Set Airtime radio name
-  command: sudo -u postgres psql --quiet --no-align --tuples-only -c "DELETE FROM cc_pref WHERE keystr = 'station_name' ; INSERT INTO cc_pref ("keystr", "valstr") VALUES ('station_name', '{{ program_name }}');" airtime
-  when: "psql_radio_name.stdout == ''"
-  notify: Reload apache2
-  tags:
-    - airtime
-    - airtime_custom
-
-#---------------------------------------------------------------------
-# Set Airtime first day of week to Monday
-#---------------------------------------------------------------------
-
-- name: Verify Airtime first day of week is Monday
-  command: sudo -u postgres psql --quiet --no-align --tuples-only -c "SELECT valstr FROM cc_pref WHERE keystr = 'week_start_day'" airtime
-  register: psql_week_first_day
-  changed_when: false
-  failed_when: false
-  tags:
-    - airtime
-    - airtime_custom
-
-- name: Set Airtime first day of week to Monday
-  command: sudo -u postgres psql --quiet --no-align --tuples-only -c "DELETE FROM cc_pref WHERE keystr = 'week_start_day' ; INSERT INTO cc_pref ("keystr", "valstr") VALUES ('week_start_day', '1');" airtime
-  when: "psql_week_first_day.stdout == ''"
-  notify: Reload apache2
-  tags:
-    - airtime
-    - airtime_custom
-
-#---------------------------------------------------------------------
-# TODO
-# Set Airtime Email settings (SMTP server, and from address)
-#---------------------------------------------------------------------
-
-#=====================================================================
-# Liquidsoap customisations
-#=====================================================================
-
-- name: Create Liquidsoap scripts destination folder
-  file: path="/home/{{ main_user }}/liquidsoap_scripts"
-        state=directory
-        mode=0775 owner="{{ main_user }}" group="{{ main_user }}"
-  tags:
-    - airtime
-    - default_playlist
-    - scrobbler
-
-- name: Deploy Liquidsoap scripts
-  template: src="{{ item }}.j2"
-            dest="/home/{{ main_user }}/liquidsoap_scripts/{{ item }}"
-            mode=0664 owner="{{ main_user }}" group="{{ main_user }}"
-            validate="airtime-liquidsoap --check-lib %s"
-  with_items:
-    - "ls_{{ program_code }}.liq"
-    - "ls_{{ program_code }}_scrobbler.liq"
-  notify: Restart airtime-liquidsoap
-  tags:
-    - airtime
-    - default_playlist
-    - scrobbler
-
-#---------------------------------------------------------------------
-# Liquidsoap: Setup the fallback default playlist
-#---------------------------------------------------------------------
-
-- name: Include our default Liquidsoap playlist script into Airtime
-  lineinfile: dest=/usr/lib/airtime/pypo/bin/liquidsoap_scripts/ls_script.liq
-              insertbefore="^default = amplify.*"
-              line='%include "/home/{{ main_user }}/liquidsoap_scripts/ls_{{ program_code }}.liq"'
-              #validate="airtime-liquidsoap --check %s"
-              # Check fails: At line 3, char 30: the variable log_file used
-              # here has not been previously defined.
-  notify: Restart airtime-liquidsoap
-  tags:
-    - airtime
-    - default_playlist
-
-- name: Comment default Liquidsoap playlist into Airtime
-  lineinfile: dest=/usr/lib/airtime/pypo/bin/liquidsoap_scripts/ls_script.liq
-              regexp="{{ item.r }}" line="{{ item.l }}" backrefs=yes
-              #validate="airtime-liquidsoap --check %s"
-  with_items:
-    - { r: '^(default = amplify.*)', l: '#\1' }
-  notify: Restart airtime-liquidsoap
-  tags:
-    - airtime
-    - default_playlist
-
-#---------------------------------------------------------------------
-# Liquidsoap: Setup the scrobbler
-#---------------------------------------------------------------------
-# Only if scrobbler_server is defined
-
-- name: Include our scrobbler script into Airtime
-  lineinfile: dest=/usr/lib/airtime/pypo/bin/liquidsoap_scripts/ls_script.liq
-              insertbefore="^if output_sound_device then"
-              line='{{ item }}'
-              #validate="airtime-liquidsoap --check %s"
-  with_items:
-    - '%include "/home/{{ main_user }}/liquidsoap_scripts/ls_{{ program_code }}_scrobbler.liq"'
-    #- 's = on_track(scrobble, s)'
-    - 's = on_metadata(scrobble, s)'
-  when: scrobbler_server is defined
-  notify: Restart airtime-liquidsoap
-  tags:
-    - airtime
-    - scrobbler
-
-# Here we simply tell LS to stop rewriting the "title" metadata to "Offline".
-# Instead (because the ref_off_air_meta variable has already be defined and
-# must be used...) lets rewrite something else, like the "comment" tag... :-/
-- name: Stop rewriting metadata when Offline
-  lineinfile: dest=/usr/lib/airtime/pypo/bin/liquidsoap_scripts/ls_script.liq
-              regexp="{{ item.r }}" line="{{ item.l }}" backrefs=yes
-              #validate="airtime-liquidsoap --check %s"
-  with_items:
-    - { r: '^(default = rewrite_metadata.*)title(.*)',
-        l: '\1comment\2' }
-  when: scrobbler_server is defined
-  notify: Restart airtime-liquidsoap
-  tags:
-    - airtime
-    - scrobbler
+- include: soundcards.yml
+- include: airtime_configuration.yml
+- include: restore_backup.yml
 

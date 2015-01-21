@@ -1,0 +1,36 @@
+---
+######################################################################
+# Soundcards settings
+######################################################################
+
+# TODO: Is using "defaults.pcm.card 0" in /etc/asound.conf a better
+# alternative? It doesn't seems to requires a reboot.
+- name: Set soundcards order
+  lineinfile: dest=/etc/modprobe.d/alsa-base.conf
+              regexp="^options {{ item.driver }}"
+              line="options {{ item.driver }} index={{ item.index }}"
+  with_items: soundcards
+  register: soundcards_order
+  tags: sound
+
+# "alsa force-reload" may return code 1 ("failed: modules still loaded: ...")
+# at the first run, but will work at the next. So let's loop a bit on it.
+- name: Reload ALSA configuration
+  command: alsa force-reload
+  register: alsa_reload
+  until: alsa_reload.rc == 0
+  retries: 5
+  delay: 2
+  when: soundcards_order|changed
+  notify: Restart airtime-liquidsoap
+  tags: sound
+
+# Set sound volume
+- name: Set ALSA volumes
+  command: amixer -c"{{ item.0.index }}" set "{{ item.1.i }}" "{{ item.1.v }}" unmute
+  with_subelements:
+    - soundcards
+    - volume
+  changed_when: false
+  tags: sound
+

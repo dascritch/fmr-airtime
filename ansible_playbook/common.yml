@@ -1,9 +1,0 @@
----
-# Playbook to setup the common basis for all servers
-
-# - hosts: all
-#   sudo: yes
-#
-#   roles:
-#     - common
-#

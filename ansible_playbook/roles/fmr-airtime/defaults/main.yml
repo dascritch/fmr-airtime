@@ -1,54 +1,22 @@
 ---
 # defaults file for fmr-airtime
 
-# NOTE: These variables must be into a host_vars/<hostname> file.
-# program_name: "FMR"
-# program_code: fmr
-# main_user: "{{ program_code }}"
-# # To generate password: mkpasswd --method=SHA-512
-# main_user_pass_sha512: "$6$vvtP72EFkul9L2.$gp2RVOvUtvMSlkD07.O3Nj5aVo9NOl9z9xKbXH6cj2ZyoegwspeVolYYT9dZwY/adv0CfZiPjyZQpHtVQA2OA/"
-#
-# scrobbler_server: "{{ Scrobbler[0] }}"
-# scrobbler_url: "http://{{ scrobbler_server }}/scrobbler-api/scrobbler.php"
-# # NOTE: If overrided, it should be done in "{group,host}_vars" folder
-# scrobbler_partner_id: "Override_Me"
-# scrobbler_partner_key: "Override_Me"
-# scrobbler_id: ""
-
 ######################################################################
+# General Configuration
+######################################################################
+
+# NOTE: These variables must be into a host_vars/ file, because "main_user"
+# creation is done before running this role.
 # NOTE: Don't forget to create template/liquidsoap_{{ program_code }}.ls.j2
-######################################################################
+program_name: ""
+program_code: ""
+main_user: "{{ program_code }}"
+# To generate password: mkpasswd --method=SHA-512
+main_user_pass_sha512: ""
 
-# If configuration changed, shall we restart (and interrupt) the stream? Or
-# will you do it manually?
-interrupt_stream_ok: true
-
-security_file: ""
-#security_file: "securite_{{ program_code }}.ogg"
-
-# storage_disk will be mounted on storage_mount
-storage_disk: "/dev/sdb"
-storage_mount: "/mnt/localdisk"
-
-# NOTE: "airtime_path" MUST be overrided into a {group,host}_vars file, because
-# it has already been set by roles/airtime/defaults.
-#airtime_path: ""
-library_path: "{{ storage_mount }}/discotheque"
-# To simplify templates management, add a bunch of path variables:
-music_path: "{{ library_path }}/Fond musical"
-rotation_path: "{{ library_path }}/Fond rotation"
-playlists_path: "{{ library_path }}/Playlists"
-jingles_path: "{{ library_path }}/Jingles"
-publicites_path: "{{ library_path }}/Publicites"
-tophoraires_path: "{{ library_path }}/Top horaires"
-
-nas_mount: "/mnt/nas"
-nas_hostname: "192.168.1.100"
-nas_share: "Telechargements/discotheque"
-
-# Soundcards prefered order and volume.
-# NOTE: Soundcards index must start at 0, as it's the default card.
-# Use "amixer" to know what volume identifiers to use.
+# Soundcards prefered order and volume. Use "amixer" to know what volume
+# identifiers to use.
+# NOTE: Default soundcard's index must be 0.
 soundcards:
   - index: 0
     driver: "snd-ice1712"     # M2496 [M Audio Audiophile 24/96]
@@ -60,4 +28,66 @@ soundcards:
     volume:
       - { i: "Master,0", v: "75%" }
 
+######################################################################
+# Filesystem Settings
+######################################################################
+
+#=====================================================================
+# Sounds Library
+#=====================================================================
+
+# Local disk device dedicated to storage (if none, leave empty).
+storage_disk: ""    # /dev/sdb
+# Mount point (or folder, if no dedicated disk) where NAS is rsync'ed.
+storage_mount: "/mnt/storage"
+
+# NAS Samba share from where sounds are rsync'ed to "library_path".
+nas_music_mount: "/mnt/music_nas"
+nas_music_hostname: ""
+nas_music_share: ""
+
+# NOTE: "airtime_path" MUST be set into a host_vars file, because it has
+# already been set by roles/airtime/defaults.
+airtime_path: "{{ storage_mount }}/airtime"
+
+library_path: "{{ storage_mount }}/discotheque"
+# To simplify templates management, add a bunch of path variables.
+# FIXME: "music_path" correspondant à "tout", peut-être que c'est inutile d'y
+# accéder depuis Airtime ? Ou peut-être devrait-ce être un montage Samba ?
+music_path: "{{ library_path }}/Fond musical"
+rotation_path: "{{ library_path }}/Fond rotation"
+playlists_path: "{{ library_path }}/Playlists"
+jingles_path: "{{ library_path }}/Jingles"
+publicites_path: "{{ library_path }}/Publicites"
+tophoraires_path: "{{ library_path }}/Top horaires"
+
+#=====================================================================
+# Backup Destination
+#=====================================================================
+
+nas_backup_mount: "/mnt/backup_nas"
+nas_backup_hostname: ""
+nas_backup_share: ""
+
+######################################################################
+# Option Settings
+######################################################################
+
+# NOTE: These variables should be into a host_vars/ file, because they are used
+# in both roles "fmr-airtime" and "fmr-airtime-scrobbler".
+scrobbler_server: "{{ Scrobbler[0] }}"
+scrobbler_url: "http://{{ scrobbler_server }}/scrobbler-api/scrobbler.php"
+scrobbler_partner_id: "Override_Me"
+scrobbler_partner_key: "Override_Me"
+scrobbler_id: ""
+
+# Shall we restart (and interrupt) the stream if Airtime configuration has
+# changed? If false, don't forget to do it manually!
+interrupt_stream_ok: true
+
+# If you want a sound file to stream when nothing else is available. It must be
+# available under "files/".
+#security_file: "securite_{{ program_code }}.ogg"
+
+######################################################################
 # vim: ft=ansible

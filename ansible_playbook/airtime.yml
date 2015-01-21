@@ -3,6 +3,8 @@
 
 ######################################################################
 # Setup Airtime servers
+######################################################################
+
 - hosts: Airtime
   # FIXME: Temporary fix for https://github.com/ansible/ansible/issues/9986
   sudo: yes
@@ -30,5 +32,14 @@
 
 ######################################################################
 # Setup Scrobbler server
-- include: airtime-scrobbler.yml
+######################################################################
+
+- hosts: Scrobbler
+  sudo: yes
+
+  roles:
+    - common
+    # cd roles && ansible-galaxy install geerlingguy.apache
+    #- geerlingguy.apache
+    - fmr-airtime-scrobbler
 

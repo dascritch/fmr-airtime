@@ -8,3 +8,5 @@ adhoc/[Ll]ocal
 pyvenv.cfg
 ansible_playbook/host_vars/airtime
 .vagrant
+backup_airtime-*-*.tar.xz
+Session.vim

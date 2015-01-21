@@ -1,0 +1,21 @@
+---
+######################################################################
+# Restore a backup
+######################################################################
+# If a file named "backup_airtime-fmr-*" is present in the playbook root dir,
+# then it will be restored on the remote host.
+
+- name: Upload the provided backup file, if any
+  unarchive: src="{{ item }}"
+             dest="/home/{{ main_user }}/"
+             mode=0664 owner="{{ main_user }}" group="{{ main_user }}"
+  with_fileglob:
+    - "../../../backup_airtime-{{ program_code }}-*"
+  register: uploaded_backup
+  tags: backup_restore
+
+- name: Restore the provided backup file, if any
+  shell: /home/{{ main_user }}/backup_airtime-{{ program_code }}-*/restore.sh --i-am-sure
+  when: uploaded_backup|changed
+  tags: backup_restore
+

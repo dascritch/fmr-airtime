@@ -1,6 +1,5 @@
 ---
 # Playbook for all servers
 
-# - include: common.yml
 - include: airtime.yml
 
