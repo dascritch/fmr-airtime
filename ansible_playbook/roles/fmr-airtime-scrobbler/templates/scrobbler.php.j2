@@ -32,33 +32,47 @@ $week_info  = $_POST["week_info"];
 $start = date("Y-m-d H:i:s");
 $end   = date("Y-m-d H:i:s", time() + $duration);
 
-#=====================================================================
+######################################################################
+# Preparation
+######################################################################
+
+if ($artist == "" || $title == "") {
+    $name = $artist . $title;
+} else {
+    $name = $artist . " - " . $title;
+}
+
+######################################################################
 # week-info is not modified
-#=====================================================================
+######################################################################
+
 $week_info = "***($week_info)";
 file_put_contents($f_week_info, $week_info);
 
-#=====================================================================
+######################################################################
 # live-info
-#=====================================================================
-# We must add a "currentShow" entry if it was absent.
-$json_li = json_decode($live_info, true);
+######################################################################
 
-if (count($json_li["currentShow"]) == 0) {
-    $currentShow = array(
-        "currentShow" => array(array(
-            "name"              => "$artist - $title",
-            "starts"            => "$start",
-            "start_timestamp"   => "$start",
-            "end_timestamp"     => "$end",
-            "ends"              => "$end",
-            "url"               => "",
-        ))
-    );
-    $live_info = json_encode(array_merge($json_li, $currentShow));
+# Add a "currentShow" to the JSON only if we do have info!
+if ($name != "") {
+    $json_li = json_decode($live_info, true);
+
+    # Don't overwrite the "currentShow" if it's already present.
+    if (count($json_li["currentShow"]) == 0) {
+        $currentShow = array(
+            "currentShow" => array(array(
+                "name"              => "$name",
+                "starts"            => "$start",
+                "start_timestamp"   => "$start",
+                "end_timestamp"     => "$end",
+                "ends"              => "$end",
+                "url"               => "",
+            ))
+        );
+        $live_info = json_encode(array_merge($json_li, $currentShow));
+    }
 }
 
-# Add the callback
 $live_info = "***($live_info)";
 file_put_contents($f_live_info, $live_info);
 
