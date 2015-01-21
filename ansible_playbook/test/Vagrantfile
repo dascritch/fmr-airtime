@@ -62,7 +62,6 @@ if [ ! -e /var/tmp/provisioning_done ]; then
   sudo apt-get update
   sudo apt-get install -y libapache2-mod-php5
   touch /var/tmp/provisioning_done
-  sudo reboot
 fi
 EOF
 
