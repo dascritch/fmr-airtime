@@ -69,9 +69,9 @@ d-i netcfg/choose_interface select auto
 # Any hostname and domain names assigned from dhcp take precedence over
 # values set here. However, setting the values still prevents the questions
 # from being shown, even if values come from dhcp.
-# XXX Default hostname should be overrided by syslinux.cfg "hostname=" setting
-d-i netcfg/get_hostname string test-airtime
-d-i netcfg/get_domain string test-localdomain
+# XXX hostname should be overrided by syslinux.cfg "netcfg/hostname=" setting.
+d-i netcfg/get_hostname string unconfigured-hostname
+d-i netcfg/get_domain string unconfigured-domain
 
 # Disable that annoying WEP key dialog.
 d-i netcfg/wireless_wep string
