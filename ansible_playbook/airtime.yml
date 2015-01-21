@@ -29,6 +29,7 @@
     - name: Restart system on first install
       command: reboot
       when: airtime_install is defined and airtime_install|changed
+            and has_rebooted is not defined
 
 ######################################################################
 # Setup Scrobbler server

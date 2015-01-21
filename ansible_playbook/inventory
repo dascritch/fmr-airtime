@@ -4,6 +4,7 @@
 # FIXME: Requires to add "sudo: yes" into playbooks as well, as a temporary fix
 # for https://github.com/ansible/ansible/issues/9986
 [all]
+test-airtime            ansible_ssh_user=deploy ansible_sudo=yes
 fmr-airtime             ansible_ssh_user=deploy ansible_sudo=yes
 booster-airtime         ansible_ssh_user=deploy ansible_sudo=yes
 londemiroir-airtime     ansible_ssh_user=deploy ansible_sudo=yes
@@ -13,6 +14,7 @@ londemiroir-airtime     ansible_ssh_user=deploy ansible_sudo=yes
 # Serveurs Airtime/Liquidsoap
 ######################################################################
 [Airtime]
+test-airtime
 fmr-airtime
 booster-airtime
 londemiroir-airtime

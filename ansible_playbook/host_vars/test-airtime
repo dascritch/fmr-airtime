@@ -5,7 +5,7 @@
 airtime_pass_md5: "bcf19cbb68ac0bad2fb0adb24840f2fc"
 
 # NOTE: Don't forget to create template/liquidsoap_{{ program_code }}.ls.j2
-program_name: "FMR"
+program_name: "FMR TEST"
 program_code: fmr
 main_user: "{{ program_code }}"
 # To generate password: mkpasswd --method=SHA-512
@@ -18,7 +18,7 @@ soundcards:
   - index: 0
     driver: "snd-hda-intel"   # MID [HDA Intel MID]
     volume:
-      - { i: "Master,0", v: "50%" }
+      - { i: "Master,0", v: "75%" }
 
 ######################################################################
 
@@ -31,11 +31,5 @@ airtime_path: "{{ storage_mount }}/airtime"
 
 nas_backup_hostname: "{{ nas_music_hostname }}"
 nas_backup_share: "TestRW"
-
-# scrobbler_server: "{{ groups['Scrobbler'][0] }}"
-# scrobbler_url: "http://{{ scrobbler_server }}/scrobbler-api/scrobbler.php"
-# scrobbler_partner_id: "Override_Me"
-# scrobbler_partner_key: "Override_Me"
-# scrobbler_id: ""
 
 # vim: ft=ansible

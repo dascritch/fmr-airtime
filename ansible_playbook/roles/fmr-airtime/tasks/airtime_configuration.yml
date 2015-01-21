@@ -218,11 +218,22 @@
             validate="airtime-liquidsoap --check-lib %s"
   with_items:
     - "ls_{{ program_code }}.liq"
-    - "ls_{{ program_code }}_scrobbler.liq"
   notify: Restart airtime-liquidsoap
   tags:
     - airtime
     - default_playlist
+
+- name: Deploy Liquidsoap scripts
+  template: src="{{ item }}.j2"
+            dest="/home/{{ main_user }}/liquidsoap_scripts/{{ item }}"
+            mode=0664 owner="{{ main_user }}" group="{{ main_user }}"
+            validate="airtime-liquidsoap --check-lib %s"
+  with_items:
+    - "ls_{{ program_code }}_scrobbler.liq"
+  when: scrobbler_server is defined and scrobbler_server != ""
+  notify: Restart airtime-liquidsoap
+  tags:
+    - airtime
     - scrobbler
 
 #---------------------------------------------------------------------
@@ -266,7 +277,7 @@
     - '%include "/home/{{ main_user }}/liquidsoap_scripts/ls_{{ program_code }}_scrobbler.liq"'
     #- 's = on_track(scrobble, s)'
     - 's = on_metadata(scrobble, s)'
-  when: scrobbler_server is defined
+  when: scrobbler_server is defined and scrobbler_server != ""
   notify: Restart airtime-liquidsoap
   tags:
     - airtime
@@ -275,14 +286,14 @@
 # Here we simply tell LS to stop rewriting the "title" metadata to "Offline".
 # Instead (because the ref_off_air_meta variable has already be defined and
 # must be used...) lets rewrite something else, like the "comment" tag... :-/
-- name: Stop rewriting metadata when Offline
+- name: Stop rewriting metadata when Offline (for Scrobbler)
   lineinfile: dest=/usr/lib/airtime/pypo/bin/liquidsoap_scripts/ls_script.liq
               regexp="{{ item.r }}" line="{{ item.l }}" backrefs=yes
               #validate="airtime-liquidsoap --check %s"
   with_items:
     - { r: '^(default = rewrite_metadata.*)title(.*)',
         l: '\1comment\2' }
-  when: scrobbler_server is defined
+  when: scrobbler_server is defined and scrobbler_server != ""
   notify: Restart airtime-liquidsoap
   tags:
     - airtime

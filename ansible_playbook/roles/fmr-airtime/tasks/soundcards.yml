@@ -13,16 +13,40 @@
   register: soundcards_order
   tags: sound
 
-# "alsa force-reload" may return code 1 ("failed: modules still loaded: ...")
-# at the first run, but will work at the next. So let's loop a bit on it.
+# "alsa force-reload" may return code 1 while unloading drivers:
+# Unloading ALSA sound driver modules: ... (failed: modules still loaded: ...).
+# Because it may fail at the first run but success at the next, let's loop a
+# few times.
 - name: Reload ALSA configuration
   command: alsa force-reload
   register: alsa_reload
   until: alsa_reload.rc == 0
-  retries: 5
-  delay: 2
+  retries: 3
+  delay: 1
+  ignore_errors: yes
   when: soundcards_order|changed
   notify: Restart airtime-liquidsoap
+  tags: sound
+
+- name: Reboot the server, because reloading ALSA wasn't enought
+  command: "shutdown -r now Ansible: Reload ALSA drivers"
+  register: has_rebooted
+  when: alsa_reload|failed
+  tags: sound
+
+# FIXME: AWFULHACK: We use the "pause" action instead of the "local_action:
+# wait_for" because it always fails, trying to sudo on the localhost, with no
+# regards to the "sudo: no" parameter... :-(
+# - name: Wait for the server to reboot
+#   sudo: no
+#   local_action: wait_for
+#                 delay=30 timeout=120
+#                 port=80 host="{{ inventory_hostname }}"
+#   when: alsa_reload|failed
+#   tags: sound
+- name: Wait for the server to reboot (pause)
+  pause: seconds=80
+  when: alsa_reload|failed
   tags: sound
 
 # Set sound volume

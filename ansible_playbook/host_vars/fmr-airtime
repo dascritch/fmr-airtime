@@ -31,18 +31,18 @@ soundcards:
 storage_disk: "/dev/sdb"
 
 # TODO
-nas_music_hostname: ""
-nas_music_share: ""
+nas_music_hostname: "192.168.1.100"
+nas_music_share: "Telechargements/discotheque"
 
 # NOTE: "airtime_path" MUST be set into a host_vars file, because it has
 # already been set by roles/airtime/defaults.
 airtime_path: "{{ storage_mount }}/airtime"
 
 # TODO
-nas_backup_hostname: ""
-nas_backup_share: ""
+nas_backup_hostname: "{{ nas_music_hostname }}"
+nas_backup_share: "TestRW"
 
-# scrobbler_server: "{{ groups['Scrobbler'][0] }}"
+# scrobbler_server: "{{ groups['Scrobbler'][0] | default('') }}"
 # scrobbler_url: "http://{{ scrobbler_server }}/scrobbler-api/scrobbler.php"
 # scrobbler_partner_id: "Override_Me"
 # scrobbler_partner_key: "Override_Me"
